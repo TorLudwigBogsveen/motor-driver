@@ -1,11 +1,12 @@
 #include "can_driver.hpp"
 #include "protocol.hpp"
 
-#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
+
+#include <stdio.h>
 
 static const char* TAG = "MOTOR_SIM";
 
