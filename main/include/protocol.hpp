@@ -30,7 +30,7 @@ constexpr uint32_t ID_RESET_COMMAND 	  = DRIVER_CONTROLS_BASE_ADDRESS + 0x03;   
 
 // CAN Message Identifiers for Motor Controll Broadcast Messages
 constexpr uint32_t ID_IDENTIFICATION_INFORMATION 	= MOTOR_CONTROLLER_BASE_ADDRESS + 0x00; ///< Identification Information (Interval 1000ms)
-constexpr uint32_t ID_STATUS_INFORMATION 			= MOTOR_CONTROLLER_BASE_ADDRESS + 0x01;         ///< Status Information (Interval 200ms)
+constexpr uint32_t ID_STATUS_INFORMATION 			= MOTOR_CONTROLLER_BASE_ADDRESS + 0x01; ///< Status Information (Interval 200ms)
 constexpr uint32_t ID_BUS_MEASUREMENT 				= MOTOR_CONTROLLER_BASE_ADDRESS + 0x02; ///< Bus Measurement (Interval 200ms)
 constexpr uint32_t ID_VELOCITY_MEASUREMENT 			= MOTOR_CONTROLLER_BASE_ADDRESS + 0x03; ///< Velocity Measurement (Interval 200ms)
 constexpr uint32_t ID_PHASE_CURRENT_MEASUREMENT 	= MOTOR_CONTROLLER_BASE_ADDRESS + 0x04; ///< Phase Current Measurement (Interval 200ms)
