@@ -78,6 +78,12 @@ VS Code with ESP-IDF extension
 
 ## Usage
 
+### Clone this project
+```bash
+git clone https://github.com/KrapnixFootball/can-simulation-system.git
+cd can-simulation-system/CAN_MotorController_Simulator
+```
+
 ### Build and Flash
 ```bash
 # Build project
@@ -87,7 +93,7 @@ idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 
 # For Windows:
-# idf.py -p COM3 flash monitor
+idf.py -p COM3 flash monitor
 ```
 
 ### **Basic Operation**
