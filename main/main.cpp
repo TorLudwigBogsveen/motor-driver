@@ -295,11 +295,27 @@ void MotorControllerSimulator::updateSimulation(uint32_t current_time_ms) {
     }
     
     // ---- MOTOR VELOCITY DYNAMICS: Simulate realistic acceleration/deceleration ----
-    float velocity_error = state.target_motor_velocity_rpm - state.motor_velocity_rpm;
-    float max_acceleration = 1000.0f;  // RPM per second (realistic for an electric motor)
+    
+    // Motor physics limits, simulated maximum RPM based on motor design
+    constexpr float MAX_MOTOR_RPM{ 4000.0f }; // For now as I don't really know what else to put
+    
+    // Limit target RPM to realistic maximum
+    float limited_target_rpm{ std::min(fabsf(state.target_motor_velocity_rpm), MAX_MOTOR_RPM) };
+    if (state.target_motor_velocity_rpm < 0) {
+        limited_target_rpm = -limited_target_rpm;  // Preserve direction for reverse
+    }
+    
+    // Calculate error with limited target
+    float velocity_error{ limited_target_rpm - state.motor_velocity_rpm };
+    
+    // Reduce acceleration at higher speeds (motors lose torque at high RPM)
+    float max_acceleration{ 1000.0f };  // RPM per second (realistic for an electric motor)
+    float speed_factor{ 1.0f - (fabsf(state.motor_velocity_rpm) / MAX_MOTOR_RPM) };
+    speed_factor = std::max(0.1f, speed_factor);  // Minimum 10% acceleration at max speed
+    float adjusted_acceleration{ max_acceleration * speed_factor };
     
     if (fabsf(velocity_error) > 1.0f) {  // Only update if significant difference
-        float velocity_change = max_acceleration * delta_time_s;
+        float velocity_change = adjusted_acceleration * delta_time_s;
         if (velocity_error > 0) {
             state.motor_velocity_rpm += std::min(velocity_change, velocity_error);
         } else {
