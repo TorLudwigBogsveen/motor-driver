@@ -65,6 +65,8 @@ T abs(T a) {
 	return -a;
 }
 
+#include <iostream>
+
 const int numDriveModes = 3;
 const DriveMode driveModes[numDriveModes] = {DriveMode::Current, DriveMode::Velocity, DriveMode::Custom1};
 
@@ -96,7 +98,15 @@ SpeedCommand Controller::motorCommand() {
 	return command;
 }
 
+void Controller::setTime(uint32_t millis, uint32_t micros) {
+	lastTime = currentTime;
+	currentTime = micros;
+}
+
 void Controller::update(uint32_t millis, uint32_t micros) {
+	//Clear errors that are no longer valid
+	clearError();
+
 	currentTime = millis;
 	deltaTime = micros - lastTime;
 	lastTime = micros;
@@ -105,14 +115,13 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	
 	int c = sliders.get(REGENERATION_POTENTIOMETER);
 	setMotorRegenMultiplier(float(c) / MAX_POT_VALUE);
-	c = sliders.get(ACCELERATION_POTENTIOMETER);
-	c = max(c - ACCELERATION_CUTOFF, 0);
-	sliders.set(ACCELERATION_POTENTIOMETER, c);
 
 	MotorFlags result = MotorFlags::Success;
-	if(timeSinceMotorDataReceived > (uint32_t)MOTOR_TIMEOUT*1000) { //timeSinceMotorDataReceived is in micros while MOTOR_TIMEOUT is in millis
+	if(timeSinceMotorDataReceived > (uint32_t)MOTOR_TIMEOUT*10000) { //timeSinceMotorDataReceived is in micros while MOTOR_TIMEOUT is in millis
 		result |= setMotorControllerConnected(false);
 		setError(MotorFlags::Timeout);
+		std::cout << "Delta time: " << deltaTime << std::endl;
+		std::cout << "Motor Controller Timeout" << timeSinceMotorDataReceived << ":" << MOTOR_TIMEOUT*10000 << std::endl;
 	} else {
 		result |= setMotorControllerConnected(true);
 	}
@@ -130,12 +139,14 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	if(result != MotorFlags::Success) {
 		setState(ControllerState::Error);
 		setError(result);
+		std::cout << "Error setting direction: " << static_cast<int>(result) << std::endl;
 	}
 
 	if(buttons.getJustPressed(CRUISE_SWITCH_BIT)) {
 		MotorFlags result = toggleCruise();
 		if (result != MotorFlags::Success) {
 			setState(ControllerState::Error);
+			std::cout << "Error toggling cruise: " << static_cast<int>(result) << std::endl;
 		}
 	}
 	if(buttons.getJustPressed(DRIVE_MODE_SWITCH_BIT)) {
@@ -462,6 +473,7 @@ void Controller::stateError() {
 
 void Controller::stateCurrentDrive() {
 	if (direction == MotorDirection::Forward) {
+		std::cout << "Forward Current Drive, slider value: " << sliders.get(ACCELERATION_POTENTIOMETER) << std::endl; 
 		setTargetMotorCurrentPercentage((float(sliders.get(ACCELERATION_POTENTIOMETER)) / MAX_POT_VALUE) * MAX_FORWARD_CURRENT);
 		setTargetMotorVelocity(MAX_FORWARD_VELOCITY);
 	}

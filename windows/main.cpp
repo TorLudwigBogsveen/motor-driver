@@ -17,6 +17,13 @@ void readCanMessages(Controller &controller)
     CanFrame m;
     if (canDriver.receive(m) == Result::R_SUCCESS)
     {
+        /*std::cout << "Received CAN Frame - ID: " << m.id << " DLC: " << static_cast<int>(m.dlc) << " Data: ";
+        for (int i = 0; i < m.dlc; ++i)
+        {
+            std::cout << std::hex << static_cast<int>(m.data[i]) << " ";
+        }
+        std::cout << std::dec << std::endl;*/
+
         switch (m.id)
         {
         case ID_STATUS_INFORMATION:
@@ -101,6 +108,12 @@ void loop()
 {
     readCanMessages(controller);
 
+    // Wait 10 seconds before starting motor commands
+    if (controllerClock.elapsed_millis() < 5000) {
+        controller.setTime(controllerClock.elapsed_millis(), controllerClock.elapsed_micros());
+        return;
+    }
+
     auto &buttons = controller.getButtonsMut();
     buttons.update();
     auto &sliders = controller.getSlidersMut();
@@ -110,10 +123,15 @@ void loop()
     // int val = min(max(analogRead(34) - 1000, 0) / 3, MAX_POT_VALUE);
     // sliders.set(0, val);
     controller.update(controllerClock.elapsed_millis(), controllerClock.elapsed_micros());
+    controller.setDirection(MotorDirection::Forward);
+
     if(driveCommandClock.elapsed_millis() >= 500) {
         driveCommandClock.start();
 
-        sliders.set(0, oldVal + 100);
+        static int pot = 0;
+        pot += 50;
+        sliders.set(0, pot);
+        std::cout << "Slider Value: " << sliders.get(0) << std::endl;
 
         SpeedCommand command = controller.motorCommand();
         MotorDriveCommand cmd(command.current, command.velocity);
@@ -128,6 +146,7 @@ void loop()
         std::cout << "-----------------------------" << std::endl;
 
     }
+
 }
 
 int main()

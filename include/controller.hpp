@@ -45,7 +45,7 @@ public:
     state(ControllerState::Startup),
     driveMode(STARTUP_DRIVE_MODE),
     lastDriveMode(STARTUP_DRIVE_MODE),
-    direction(MotorDirection::Forward),
+    direction(MotorDirection::Neutral),
     buttons(),
     sliders(),
     lastSentDriveCommand(0),
@@ -92,6 +92,8 @@ public:
   MotorFlags setError(MotorFlags error);
   MotorFlags getError() const;
   MotorFlags clearError();
+
+  void setTime(uint32_t millis, uint32_t micros);
 
   float getVelocity() const;
   float getOdometer() const;
