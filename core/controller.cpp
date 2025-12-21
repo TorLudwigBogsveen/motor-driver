@@ -109,31 +109,32 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	c = max(c - ACCELERATION_CUTOFF, 0);
 	sliders.set(ACCELERATION_POTENTIOMETER, c);
 
-	ControllerResult result = E_SUCCESS;
+	MotorFlags result = MotorFlags::Success;
 	if(timeSinceMotorDataReceived > (uint32_t)MOTOR_TIMEOUT*1000) { //timeSinceMotorDataReceived is in micros while MOTOR_TIMEOUT is in millis
-		result += setMotorControllerConnected(false);
+		result |= setMotorControllerConnected(false);
+		setError(MotorFlags::Timeout);
 	} else {
-		result += setMotorControllerConnected(true);
+		result |= setMotorControllerConnected(true);
 	}
 
 	if(buttons.get(NEUTRAL_DIRECTION_SWITCH_BIT)) {
-		result += setDirection(MotorDirection::Neutral);
+		result |= setDirection(MotorDirection::Neutral);
 	}
 	else if(buttons.get(FORWARD_DIRECTION_SWITCH_BIT)) {
-		result += setDirection(MotorDirection::Forward);
+		result |= setDirection(MotorDirection::Forward);
 	}
 	else if(buttons.get(BACKWARD_DIRECTION_SWITCH_BIT)) {
-		result += setDirection(MotorDirection::Backward);
+		result |= setDirection(MotorDirection::Backward);
 	}
 
-	if(result != E_SUCCESS) {
+	if(result != MotorFlags::Success) {
 		setState(ControllerState::Error);
 		setError(result);
 	}
 
 	if(buttons.getJustPressed(CRUISE_SWITCH_BIT)) {
-		ControllerResult result = toggleCruise();
-		if (result != E_SUCCESS) {
+		MotorFlags result = toggleCruise();
+		if (result != MotorFlags::Success) {
 			setState(ControllerState::Error);
 		}
 	}
@@ -142,7 +143,7 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	}
 	
 	if(heatSinkTemp > MAX_TEMP || dspBoardTemp > MAX_TEMP || motorTemp > MAX_TEMP) {
-		setError(E_OVERHEAT);
+		setError(MotorFlags::Overheat);
 	}
 
 	switch (state) {
@@ -181,7 +182,7 @@ bool Controller::isAccelerometerOff() const {
 	return sliders.get(ACCELERATION_POTENTIOMETER) <= 0;
 }
 
-ControllerResult Controller::toggleDirection() {
+MotorFlags Controller::toggleDirection() {
 	if (direction == MotorDirection::Forward) {
 		return setDirection(MotorDirection::Backward);
 	} else {
@@ -193,52 +194,65 @@ MotorDirection Controller::getDirection() const {
 	return direction;
 }
 
-ControllerResult Controller::setDirection(MotorDirection direction) {
+MotorFlags Controller::setDirection(MotorDirection direction) {
 	if (this->direction == direction) {
-		return E_SUCCESS;
+		return MotorFlags::Success;
 	}
 	if (isStationary() && isAccelerometerOff()) {
 		this->direction = direction;
-		return E_SUCCESS;
+		return MotorFlags::Success;
 	}
-	return setError(E_NOT_STATIONARY_BIT);
+	return setError(MotorFlags::NotStationary);
 }
 
-ControllerResult Controller::setMotorControllerConnected(bool connected) {
+MotorFlags Controller::setMotorControllerConnected(bool connected) {
 	if (motorControllerConnected == connected) {
-		return E_SUCCESS;
+		return MotorFlags::Success;
 	}
 
-	if (isStationary() && isAccelerometerOff()) {
-		motorControllerConnected = connected;
-		return E_SUCCESS;
-	} else {
-		return setError(E_CAN);
+	if (!connected) {
+		motorControllerConnected = false;
+		return MotorFlags::Success;
 	}
+
+	if (!isStationary()) {
+		return setError(
+			MotorFlags::NotStationary
+		);
+	};
+
+	if (!isAccelerometerOff()) {
+		return setError(
+			MotorFlags::NotStationary
+		);
+	};
+	
+	motorControllerConnected = connected;
+	return MotorFlags::Success;
 }
 
 ControllerState Controller::getState() const {
 	return state;
 }
 
-ControllerResult Controller::setState(ControllerState state) {
+MotorFlags Controller::setState(ControllerState state) {
 	switch (state) {
 		case ControllerState::Startup:
-			return setError(E_CANNOT_SET_MODE_BIT);
+			return setError(MotorFlags::CannotSetMode);
 		case ControllerState::Error:
 			this->state = ControllerState::Error;
 			break;
 		case ControllerState::Running:
-			if (!isStationary() && isAccelerometerOff()) return setError(E_NOT_STATIONARY_BIT);
+			if (!isStationary() && isAccelerometerOff()) return setError(MotorFlags::NotStationary);
 			this->state = ControllerState::Running;
 			break;
 		case ControllerState::Parking:
-			if (!isStationary() && isAccelerometerOff()) return setError(E_NOT_STATIONARY_BIT);
+			if (!isStationary() && isAccelerometerOff()) return setError(MotorFlags::NotStationary);
 			this->state = ControllerState::Parking;
 			break;
 	}
 
-	return E_SUCCESS;
+	return MotorFlags::Success;
 }
 
 DriveMode Controller::getMode() const {
@@ -246,13 +260,13 @@ DriveMode Controller::getMode() const {
 }
 
 //TODO Saftey
-ControllerResult Controller::setMode(DriveMode driveMode) {
+MotorFlags Controller::setMode(DriveMode driveMode) {
 	this->driveMode = driveMode;
-	return E_SUCCESS;
+	return MotorFlags::Success;
 }
 
-ControllerResult Controller::setTargetMotorVelocity(float v) {
-	if(v < 0) return setError(E_NEGATIVE_FLOAT_BIT);
+MotorFlags Controller::setTargetMotorVelocity(float v) {
+	if(v < 0) return setError(MotorFlags::NegativeFloat);
 	
 	if (direction == MotorDirection::Forward)
 		targetMotorVelocity = min(v, MAX_FORWARD_VELOCITY);
@@ -261,36 +275,36 @@ ControllerResult Controller::setTargetMotorVelocity(float v) {
 	else
 		targetMotorVelocity = 0.0f;
 
-	return E_SUCCESS;
+	return MotorFlags::Success;
 }
 
-ControllerResult Controller::setTargetMotorCurrentPercentage(float c) {
+MotorFlags Controller::setTargetMotorCurrentPercentage(float c) {
 	if (c < 0.0 || c > 1.0) {
-		return setError(E_PERCENTAGE_OUT_OF_RANGE_BIT);
+		return setError(MotorFlags::PercentageOutOfRange);
 	}
 
 	targetMotorCurrent = c;
-	return E_SUCCESS;
+	return MotorFlags::Success;
 }
 
-ControllerResult Controller::setMotorRegenMultiplier(float multiplier) {
+MotorFlags Controller::setMotorRegenMultiplier(float multiplier) {
 	if (multiplier < 0.0 || multiplier > 1.0) {
-		return setError(E_PERCENTAGE_OUT_OF_RANGE_BIT);
+		return setError(MotorFlags::PercentageOutOfRange);
 	}
 	regenMultiplier = multiplier;
-	return E_SUCCESS;
+	return MotorFlags::Success;
 }
 
-ControllerResult Controller::toggleCruise() {
+MotorFlags Controller::toggleCruise() {
 	return setCruise(driveMode != DriveMode::Cruise);
 }
 
-ControllerResult Controller::setCruise(bool cruise) {
+MotorFlags Controller::setCruise(bool cruise) {
 	DriveMode currentMode = driveMode;
-	ControllerResult result = E_SUCCESS;
+	MotorFlags result = MotorFlags::Success;
 	if(!cruise && driveMode == DriveMode::Cruise) {
 		setMode(lastDriveMode);
-	} else if(driveMode != DriveMode::Cruise && (result = setMode(DriveMode::Cruise))) {
+	} else if(driveMode != DriveMode::Cruise && (result = setMode(DriveMode::Cruise)) == MotorFlags::Success) {
 		lastDriveMode = currentMode;
 		setTargetMotorVelocity(motorVelocity);
 	}
@@ -298,7 +312,7 @@ ControllerResult Controller::setCruise(bool cruise) {
 	return result;
 }
 
-ControllerResult Controller::swapNextDriveMode() {
+MotorFlags Controller::swapNextDriveMode() {
 	int index = -1;
 	for (int i = 0; i < numDriveModes; i++) {
 		if (driveModes[i] == driveMode) {
@@ -307,25 +321,25 @@ ControllerResult Controller::swapNextDriveMode() {
 		}
 	}
 	if (index == -1) {
-		return setError(E_WRONG_DRIVE_MODE_BIT);
+		return setError(MotorFlags::WrongDriveMode);
 	}
 	return setMode(driveModes[(index+1) %numDriveModes ]);
 }
 
-ControllerResult Controller::setError(ControllerResult error) {
+MotorFlags Controller::setError(MotorFlags error) {
 	this->error |= error;
-	if (this->error != E_SUCCESS)
+	if (this->error != MotorFlags::Success)
 		setState(ControllerState::Error);
 	return error;
 }
 
-ControllerResult Controller::getError() const {
+MotorFlags Controller::getError() const {
 	return error;
 }
 
-ControllerResult Controller::clearError() {
+MotorFlags Controller::clearError() {
 	//TODO make sure error condition is removed
-	error = 0;
+	error = MotorFlags::Success;
 	return error;
 }
 
@@ -399,21 +413,14 @@ ControllerSliders& Controller::getSlidersMut() {
 }
 
 void Controller::stateStartup() {
-	static unsigned long timeout = currentTime + 2000; //2 seconds
-	if (timeout < currentTime) {
-		setError(0xffff); //TODO make error 32 bit so that we can encode a error state for startup timeout
-		setState(ControllerState::Error);
-	}
-
 	if (!motorControllerConnected)
 		return;
 	if (!isAccelerometerOff())
 		return;
 	if (!isStationary())
 		return;
-		//TODO Uncomment
-	//if (direction != MotorDirection::Neutral)
-		//return;
+	if (direction != MotorDirection::Neutral)
+		return;
 
 	setState(ControllerState::Running);
 }

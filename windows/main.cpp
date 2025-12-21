@@ -22,7 +22,7 @@ void readCanMessages(Controller &controller)
         case ID_STATUS_INFORMATION:
         {
             StatusInformation status = StatusInformation(m);
-            controller.setError(status.error_flags & 0x1ff); // mask to remove unwanted reserved bits
+            controller.setError(static_cast<MotorFlags>(status.error_flags & 0x1ff)); // mask to remove unwanted reserved bits
             controller.setLimit(status.limit_flags & 0x7f);  // mask to remove unwanted reserved bits
             break;
         }
@@ -122,7 +122,7 @@ void loop()
         std::cout << "Target Current: " << command.current << " Target Velocity: " << command.velocity << std::endl;
         std::cout << "Actual Velocity: " << controller.getMotorVelocity() << " Odometer: " << controller.getOdometer() << std::endl;
         std::cout << "Heat Sink Temp: " << controller.getHeatSinkTemp() << " Motor Temp: " << controller.getMotorTemp() << " DSP Temp: " << controller.getDspBoardTemp() << std::endl;
-        std::cout << "Error Code: " << controller.getError() << " Limit Code: " << controller.getLimit() << std::endl;
+        std::cout << "Error Code: " << static_cast<int>(controller.getError()) << " Limit Code: " << controller.getLimit() << std::endl;
         std::cout << "Drive Mode: " << int(controller.getMode()) << " Direction: " << int(controller.getDirection()) << std::endl;
         std::cout << "Controller State: " << int(controller.getState()) << std::endl;
         std::cout << "-----------------------------" << std::endl;

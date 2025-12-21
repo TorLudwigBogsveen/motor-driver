@@ -63,7 +63,7 @@ public:
     heatSinkTemp(0.0),
     dspBoardTemp(0.0),
     odometer(0.0),
-    error(E_SUCCESS),
+    error(MotorFlags::Success),
     limit(0),
     motorSettingsChanged(false),
     motorControllerConnected(false) {}
@@ -73,25 +73,25 @@ public:
   bool isInDriveMode() const;
   bool isAccelerometerOff() const;
   
-  ControllerResult toggleDirection();
-  ControllerResult setDirection(MotorDirection direction);
+  MotorFlags toggleDirection();
+  MotorFlags setDirection(MotorDirection direction);
   MotorDirection getDirection() const;
-  ControllerResult setMotorControllerConnected(bool connected);
-  ControllerResult setState(ControllerState state);
+  MotorFlags setMotorControllerConnected(bool connected);
+  MotorFlags setState(ControllerState state);
   ControllerState getState() const;
-  ControllerResult setMode(DriveMode mode);
+  MotorFlags setMode(DriveMode mode);
   DriveMode getMode() const;
-  ControllerResult setTargetMotorVelocity(float v);
-  ControllerResult setTargetMotorCurrentPercentage(float c);
-  ControllerResult setMotorRegenMultiplier(float multiplier);
-  ControllerResult turnOn();
-  ControllerResult turnOff();
-  ControllerResult toggleCruise();
-  ControllerResult setCruise(bool cruise);
-  ControllerResult swapNextDriveMode();
-  ControllerResult setError(ControllerResult error);
-  ControllerResult getError() const;
-  ControllerResult clearError();
+  MotorFlags setTargetMotorVelocity(float v);
+  MotorFlags setTargetMotorCurrentPercentage(float c);
+  MotorFlags setMotorRegenMultiplier(float multiplier);
+  MotorFlags turnOn();
+  MotorFlags turnOff();
+  MotorFlags toggleCruise();
+  MotorFlags setCruise(bool cruise);
+  MotorFlags swapNextDriveMode();
+  MotorFlags setError(MotorFlags error);
+  MotorFlags getError() const;
+  MotorFlags clearError();
 
   float getVelocity() const;
   float getOdometer() const;
@@ -155,7 +155,7 @@ private:
   float heatSinkTemp;
   float dspBoardTemp;
   float odometer;
-  ControllerResult error;
+  MotorFlags error;
   uint16_t limit;
   bool motorSettingsChanged;
   bool motorControllerConnected;

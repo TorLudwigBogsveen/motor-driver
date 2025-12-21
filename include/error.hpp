@@ -2,46 +2,58 @@
 #ifndef ERROR_HPP
 #define ERROR_HPP
 
-#include <stdint.h>
+#include <cstdint>
 
-typedef uint16_t ControllerResult;
+enum class MotorFlags : std::uint32_t {
+  Success = 0,
+  MotorOverSpeed = (1 << 0),               // Motor Over Speed (15% overshoot above max RPM)
+  DesaturationFault = (1 << 1),            // Desaturation Fault (IGBT desaturation, IGBT driver OVLO)
+  Rail15vUnderVoltage = (1 << 2),          // 15V Rail under voltage lock out (UVLO)
+  ConfigReadError = (1 << 3),              // Config read error (some values may be reset to defaults)
+  WatchdogCausedLastReset = (1 << 4),      // Watchdog caused last reset
+  BadMotorPosition = (1 << 5),             // Bad motor position hall sequence
+  DcBusOvervoltage = (1 << 6),             // DC Bus over voltage
+  SoftwareOvercurrent = (1 << 7),          // Software over current
+  HardwareOvercurrent = (1 << 8),          // Hardware over current
+  NotStationary = (1 << 9),                // Motor not stationary
+  CannotSetMode = (1 << 10),               // Cannot set drive mode
+  WrongDriveMode = (1 << 11),              // Drive mode not supported
+  NegativeFloat = (1 << 12),               // Negative float value where not allowed
+  PercentageOutOfRange = (1 << 13),        // Percentage value out of range
+  Overheat = (1 << 14),                    // Overheat fault
+  Can = (1 << 15),                         // CAN communication fault
+  Timeout = (1 << 16),                     // Timeout occurred
+};
 
-/*
-  Error Codes
-*/
+inline MotorFlags operator|(MotorFlags a, MotorFlags b) {
+    return static_cast<MotorFlags>(
+        static_cast<uint32_t>(a) | static_cast<uint32_t>(b)
+    );
+}
 
-#define NUM_ERRORS 16
+inline MotorFlags operator&(MotorFlags a, MotorFlags b) {
+    return static_cast<MotorFlags>(
+        static_cast<uint32_t>(a) & static_cast<uint32_t>(b)
+    );
+}
 
-#define E_SUCCESS 0
-#define E_MOTOR_OVER_SPEED (1 << 0)               // Motor Over Speed (15% overshoot above max RPM)
-#define E_DESATURATION_FAULT (1 << 1)             // Desaturation Fault (IGBT desaturation, IGBT driver OVLO)
-#define E_15V_RAIL_UNDER_VOLTAGE (1 << 2)         // 15V Rail under voltage lock out (UVLO)
-#define E_CONFIG_READ_ERROR (1 << 3)              // Config read error (some values may be reset to defaults)
-#define E_WATCHDOG_CAUSED_LAST_RESET (1 << 4)     // Watchdog caused last reset
-#define E_BAD_MOTOR_POSITION (1 << 5)             // Bad motor position hall sequence
-#define E_DC_BUS_OVERVOLTAGE (1 << 6)             // DC Bus over voltage
-#define E_SOFTWARE_OVERCURRENT (1 << 7)           // Software over current
-#define E_HARDWARE_OVERCURRENT (1 << 8)           // Hardware over current
-#define E_NOT_STATIONARY_BIT (1 << 9)
-#define E_CANNOT_SET_MODE_BIT (1 << 10)
-#define E_WRONG_DRIVE_MODE_BIT (1 << 11)
-#define E_NEGATIVE_FLOAT_BIT (1 << 12)
-#define E_PERCENTAGE_OUT_OF_RANGE_BIT (1 << 13)
-#define E_OVERHEAT (1 << 14)
-#define E_CAN (1 << 15)
+inline MotorFlags& operator|=(MotorFlags& a, MotorFlags b) {
+    a = a | b;
+    return a;
+}
 
-/*
-  Motor Limits
-*/
+inline bool any(MotorFlags f) {
+    return static_cast<uint32_t>(f) != 0;
+}
 
-#define NUM_LIMITS 7
-
-#define L_OUTPUT_VOLTAGE_PWM (1 << 0)
-#define L_MOTOR_CURRENT (1 << 1)
-#define L_VELOCITY (1 << 2)
-#define L_BUS_CURRENT (1 << 3)
-#define L_BUS_VOLTAGE_UPPER_LIMIT (1 << 4)
-#define L_BUS_VOLTAGE_LOWER_LIMIT (1 << 5)
-#define L_IPM_OR_MOTOR_TEMPRATURE (1 << 6)
+enum class MotorLimit : std::uint32_t {
+  OutputVoltagePwm = (1 << 0),
+  MotorCurrent = (1 << 1),
+  Velocity = (1 << 2),
+  BusCurrent = (1 << 3),
+  BusVoltageUpperLimit = (1 << 4),
+  BusVoltageLowerLimit = (1 << 5),
+  IpmOrMotorTemperature = (1 << 6),
+};
 
 #endif
