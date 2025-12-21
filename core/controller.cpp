@@ -1,6 +1,46 @@
 //# Copyright (c) 2025 MDU Solar Team
 #include "controller.hpp"
 
+constexpr float POT_DEAD_ZONE_THRESHOLD = 5.0f;
+
+#define F32_EPSILON 0.0001f //Just has to be a small number in order to be used for comparing f32 values
+#define ACCELERATION_POTENTIOMETER 0
+#define REGENERATION_POTENTIOMETER 1
+#define ACCELERATION_CUTOFF 50
+#define WHEEL_RADUIS 0.274f
+
+#define STARTUP_DRIVE_MODE DriveMode::Current
+#define MAX_FORWARD_CURRENT 1.0f //Percentage max current on controller
+#define MAX_BACKWARD_CURRENT 1.0f //Percentage max current on controller
+#define MAX_FORWARD_VELOCITY 400.0f //rpm
+#define MAX_BACKWARD_VELOCITY 200.0f //rpm
+#define MAX_TEMP 80.0f
+
+#define IS_STATIONARY_MARGIN 0.001f
+#define CRUISE_VELOCITY_TIME_TO_CHANGE 100000 //Time in microseconds
+#define MAX_POT_VALUE 1023
+#define MOTOR_TIMEOUT 4000
+
+/*
+  SERIAL BUTTON BIT
+*/
+
+#define ON_OFF_SWITCH_BIT (1 << 0)
+#define FORWARD_DIRECTION_SWITCH_BIT (1 << 1)
+#define CRUISE_SWITCH_BIT (1 << 2)
+#define CRUISE_ACCELERATE_SWITCH_BIT (1 << 3)
+#define CRUISE_DEACCELERATE_SWITCH_BIT (1 << 4)
+#define DRIVE_MODE_SWITCH_BIT (1 << 5)
+#define INDICATOR_LEFT_SWITCH_BIT (1 << 6)
+#define INDICATOR_RIGHT_SWITCH_BIT (1 << 7)
+#define INDICATOR_BREAK_SWITCH_BIT (1 << 8)
+#define LCD_MODE_SWITCH_BIT (1 << 9)
+#define NEUTRAL_DIRECTION_SWITCH_BIT (1 << 10)
+#define BACKWARD_DIRECTION_SWITCH_BIT (1 << 11)
+#define PARK_SWITCH_BIT (1 << 12)
+
+
+
 template<typename T>
 T max(T a, T b) {
 	if (a < b) {
@@ -50,10 +90,13 @@ float Controller::getRegenMultiplier() const {
 }
 
 SpeedCommand Controller::motorCommand() {
-	return {.current = targetMotorCurrent, .velocity = targetMotorVelocity*int(direction)};
+	SpeedCommand command;
+	command.current = targetMotorCurrent;
+	command.velocity = targetMotorVelocity * int(direction);
+	return command;
 }
 
-void Controller::update(unsigned long millis, unsigned long micros) {
+void Controller::update(uint32_t millis, uint32_t micros) {
 	currentTime = millis;
 	deltaTime = micros - lastTime;
 	lastTime = micros;

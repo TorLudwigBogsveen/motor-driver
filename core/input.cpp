@@ -1,8 +1,10 @@
 //# Copyright (c) 2025 MDU Solar Team
 
 #include "input.hpp"
-#include "config.hpp"
 #include <math.h>
+
+constexpr float POT_DEAD_ZONE_THRESHOLD = 5.0f;
+constexpr float EMA_ALPHA = 0.1f;
 
 void Buttons::update() {
   buttonsJustChanged = 0;

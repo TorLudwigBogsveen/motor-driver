@@ -68,7 +68,7 @@ public:
     motorSettingsChanged(false),
     motorControllerConnected(false) {}
 
-  void update(unsigned long millis, unsigned long micros);
+  void update(uint32_t millis, uint32_t micros);
   bool isStationary(float margin) const;
   bool isInDriveMode() const;
   bool isAccelerometerOff() const;

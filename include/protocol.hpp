@@ -104,9 +104,14 @@ struct MotorDriveCommand {
     
     /// @brief Construct from CAN frame (deserialize)
     explicit MotorDriveCommand(const CanFrame& frame);
-    
+
     /// @brief Default constructor  
     MotorDriveCommand() : motor_current_percent{0}, motor_velocity_rpm{0} {}
+
+	/// @brief Construct with specified values
+	MotorDriveCommand(float current, float velocity)
+        : motor_current_percent(current),
+          motor_velocity_rpm(velocity) {}
 };
 
 /// @brief Power command message for motor controller
