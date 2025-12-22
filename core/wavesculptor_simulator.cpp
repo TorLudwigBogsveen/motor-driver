@@ -1,112 +1,15 @@
 #include "can_driver.hpp"
 #include "protocol.hpp"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_log.h"
-#include "esp_task_wdt.h"
-
 #include <stdio.h>
 #include <cmath>       // For sin, abs functions
 #include <algorithm>   // For std::min
+#include "log.hpp"
+#include "clock.hpp"
+#include "wavesculptor_simulator.hpp"
 
 static const char* TAG = "MOTOR_SIM";
 
-/// @brief Motor controller simulation state and behavior
-class MotorControllerSimulator {
-private:
-    // Realistic simulation parameters (cruising state at 55km/h)
-    struct SimulationState {
-        
-        // Identification
-        uint32_t serial_number{ 0x00001A4F }; // Example serial number (don't actually know)
-        uint32_t prohelion_ID{ 0x00004003 }; // Example ProHelion ID (from the docs)
-
-        // Status information (System state)
-        uint8_t receive_error_count{0}; 
-        uint8_t transmit_error_count{0};
-        uint16_t active_motor{0};
-        uint16_t error_flags{0};
-        uint16_t limit_flags{0};
-
-        // Bus Measurements
-        float bus_current_a{20.5f};
-        float bus_voltage_v{100.0f}; // Could change later to our specific one
-
-        // Velocity Measurements
-        float vehicle_velocity_m_s{15.28f}; // 55 km/h, calculated from 3500 RPM and wheel size of 0.2619047619m radius
-        float motor_velocity_rpm{3500.0f}; // Corresponding realistic motor RPM at 55 km/h
-
-        // Phase Current Measurement
-        float motor_phase_c_current{32.1f}; // RMS phase current is typically higher than the DC bus current due the PWM
-        float motor_phase_b_current{32.1f}; // (Corrected typo in docs) It should be equal to phase C current at speed
-
-        // Motor Voltage Vector Measurement (UNSURE OF THIS)
-        float motor_v_d{0.0f};
-        float motor_v_q{65.0f};
-
-        // Motor Current Vector Measurement
-        float motor_i_d{-0.5f};
-        float motor_i_q{35.0f};
-
-        // Motor BackEMF Measurement
-        float bemf_d{0.0f};
-        float bemf_q{80.5f};
-
-        // 15V Voltage Rail Measurement
-        float supply_of_15v{14.9f};
-
-        // 3V3 and 1V9 Voltage Rail Measurement
-        float supply_of_3v3{3.31f};
-        float supply_of_1v9{1.91f};
-
-        // Heat Sink and Motor Temperature Measurement
-        float heat_sink_temperature_c{45.0f};
-        float motor_temperature_c{60.0f};
-
-        // DSP Board Temperature Measurement
-        float dsp_board_temperature_c{35.5f};
-
-        // Odometer and Bus Amp-Hours Measurement
-        float dc_bus_amp_hours{105.7f};
-        float odometer_m{185000.0f}; // 185 km
-
-        // Command targets and actual values
-        float target_motor_current_percent{0.0f};
-        float target_motor_velocity_rpm{0.0f};
-        float power_command_bus_current_limit_percent{1.0f};  // Power limiter (1.0 = 100%, default: no limit)
-        
-        uint32_t last_drive_command_time{0};  // Track when last command was received
-        uint32_t last_power_command_time{0};  // Track when last power command was received
-        uint32_t last_simulation_update_time{0};  // For delta-time calculations
-        
-        // Timing for periodic messages (in ms)
-        uint32_t last_identification_time{0};
-        uint32_t last_status_info_time{0};
-        uint32_t last_bus_measurement_time{0};
-        uint32_t last_velocity_measurement_time{0};
-        uint32_t last_phase_current_measurement_time{0};
-        uint32_t last_motor_voltage_vector_measurement_time{0};
-        uint32_t last_motor_current_vector_measurement_time{0};
-        uint32_t last_motor_backemf_time{0};
-        uint32_t last_15v_rail_time{0};
-        uint32_t last_3v3_1v9_rail_time{0};
-        uint32_t last_heatsink_motor_temp_time{0};
-        uint32_t last_dsp_board_temp_time{0};
-        uint32_t last_odometer_amp_hours_time{0};
-
-    } state;
-
-public:
-    /// @brief Process received CAN commands (Drive, Power, Reset)
-    void processIncomingCommand(const CanFrame& frame);
-    
-    /// @brief Send periodic status and measurement messages  
-    void sendPeriodicMessages(uint32_t current_time_ms, CanDriver& can_driver);
-    
-    /// @brief Update simulation physics and state
-    void updateSimulation(uint32_t current_time_ms);
-};
+static Clock clock;
 
 // Implementation of MotorControllerSimulator methods
 void MotorControllerSimulator::processIncomingCommand(const CanFrame& frame) {
@@ -116,32 +19,32 @@ void MotorControllerSimulator::processIncomingCommand(const CanFrame& frame) {
         state.target_motor_velocity_rpm = cmd.motor_velocity_rpm;
         state.target_motor_current_percent = cmd.motor_current_percent;
         
-        state.last_drive_command_time = pdTICKS_TO_MS(xTaskGetTickCount());
-        ESP_LOGI(TAG, "Drive Command: %.1f%% current, %.0f RPM", 
+        state.last_drive_command_time = clock.elapsed_millis();
+        log(TAG, "Drive Command: %.1f%% current, %.0f RPM", 
                  cmd.motor_current_percent * 100.0f, cmd.motor_velocity_rpm);
     }
     // Handle Power Commands  
     else if (frame.id == ID_MOTOR_POWER_COMMAND) {
         MotorPowerCommand cmd{frame};
         state.power_command_bus_current_limit_percent = cmd.bus_current;
-        state.last_power_command_time = pdTICKS_TO_MS(xTaskGetTickCount());
-        ESP_LOGI(TAG, "Power Command: %.1f%% bus current limit applied", cmd.bus_current * 100.0f);
+        state.last_power_command_time = clock.elapsed_millis();
+        log(TAG, "Power Command: %.1f%% bus current limit applied", cmd.bus_current * 100.0f);
     }
     // Handle Reset Commands
     else if (frame.id == ID_RESET_COMMAND) {
-        ESP_LOGI(TAG, "Reset Command received - resetting simulation state");
+        log(TAG, "Reset Command received - resetting simulation state");
         // Not sure what to do here...
     }
 }
 
-void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, CanDriver& can_driver) {
+void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, void(*transmit_func)(const CanFrame&, void*)) {
     // Send Identification Information every 1000ms
     if (current_time_ms - state.last_identification_time >= 1000) {
         IdentificationInformation id_info{};
         id_info.prohelion_ID = state.prohelion_ID;
         id_info.serial_number = state.serial_number;
 
-        can_driver.transmit(pack(id_info));
+        (transmit_func)(pack(id_info), t_state);
         state.last_identification_time = current_time_ms;
     }
     
@@ -154,7 +57,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         status.transmit_error_count = state.transmit_error_count;
         status.receive_error_count = state.receive_error_count;
         
-        can_driver.transmit(pack(status));
+        (transmit_func)(pack(status), t_state);
         state.last_status_info_time = current_time_ms;
     }
     
@@ -164,7 +67,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.bus_voltage = state.bus_voltage_v;
         measurement.bus_current = state.bus_current_a;
         
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_bus_measurement_time = current_time_ms;
     }
     
@@ -174,7 +77,9 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.motor_velocity_rpm = state.motor_velocity_rpm;
         measurement.vehicle_velocity = state.vehicle_velocity_m_s;
 
-        can_driver.transmit(pack(measurement));
+        log(TAG, "Sending Velocity Measurement: %.1f m/s, %.0f RPM", measurement.vehicle_velocity, measurement.motor_velocity_rpm);
+
+        (transmit_func)(pack(measurement), t_state);
         state.last_velocity_measurement_time = current_time_ms;
     }
 
@@ -184,7 +89,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.phase_b_current = state.motor_phase_b_current;
         measurement.phase_c_current = state.motor_phase_c_current;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_phase_current_measurement_time = current_time_ms;
     }
 
@@ -194,7 +99,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.v_q = state.motor_v_q;
         measurement.v_d = state.motor_v_d;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_motor_voltage_vector_measurement_time = current_time_ms;
     }
 
@@ -204,7 +109,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.i_q = state.motor_i_q;
         measurement.i_d = state.motor_i_d;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_motor_current_vector_measurement_time = current_time_ms;
     }
 
@@ -214,7 +119,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.BEMf_q = state.bemf_q;
         measurement.BEMf_d = state.bemf_d;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_motor_backemf_time = current_time_ms;
     }
 
@@ -223,7 +128,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         VoltageRailMeasurement15V measurement{};
         measurement.supply_of_15V = state.supply_of_15v;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_15v_rail_time = current_time_ms;
     }
 
@@ -234,7 +139,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.supply_of_3V3 = state.supply_of_3v3;
         
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_3v3_1v9_rail_time = current_time_ms;
     }
 
@@ -244,7 +149,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.motor_temp = state.motor_temperature_c;
         measurement.heat_sink_temp = state.heat_sink_temperature_c;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_heatsink_motor_temp_time = current_time_ms;
     }
 
@@ -253,7 +158,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         DSPBoardTemperatureMeasurement measurement{};
         measurement.DSP_board_temp = state.dsp_board_temperature_c;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_dsp_board_temp_time = current_time_ms;
     }
 
@@ -263,7 +168,7 @@ void MotorControllerSimulator::sendPeriodicMessages(uint32_t current_time_ms, Ca
         measurement.odometer = state.odometer_m;
         measurement.DC_bus_amp_hours = state.dc_bus_amp_hours;
 
-        can_driver.transmit(pack(measurement));
+        (transmit_func)(pack(measurement), t_state);
         state.last_odometer_amp_hours_time = current_time_ms;
     }
 }
@@ -283,16 +188,21 @@ void MotorControllerSimulator::updateSimulation(uint32_t current_time_ms) {
     if (drive_command_timeout && state.last_drive_command_time > 0) {
         state.target_motor_velocity_rpm = 0.0f;
         state.target_motor_current_percent = 0.0f;
-        ESP_LOGW(TAG, "Drive command timeout - motor stopping");
+        logw(TAG, "Drive command timeout - motor stopping");
     }
     
+    //TODO Remove, there is no timeout for power command in WaveSculptor spec
+    /*
+
     // The following one I made up:
     // Power command timeout (1000ms) - revert to 100% power limit if no recent power command
     bool power_command_timeout = (current_time_ms - state.last_power_command_time) > 1000;
     if (power_command_timeout && state.last_power_command_time > 0) {
         state.power_command_bus_current_limit_percent = 1.0f; // Remove power limiting (1.0 = 100%)
-        ESP_LOGW(TAG, "Power command timeout - removing power limits");
+        logw(TAG, "Power command timeout - removing power limits");
     }
+
+    */
     
     // ---- MOTOR VELOCITY DYNAMICS: Simulate realistic acceleration/deceleration ----
     
@@ -345,7 +255,7 @@ void MotorControllerSimulator::updateSimulation(uint32_t current_time_ms) {
     if (requested_current > power_limited_current) {
         static uint32_t last_power_limit_log = 0;
         if (current_time_ms - last_power_limit_log > 2000) {  // Log every 2 seconds
-            ESP_LOGW(TAG, "Power limiting active: requested %.1fA, limited to %.1fA (%.1f%% power limit)", 
+            logw(TAG, "Power limiting active: requested %.1fA, limited to %.1fA (%.1f%% power limit)", 
                      requested_current, power_limited_current, state.power_command_bus_current_limit_percent * 100.0f);
             last_power_limit_log = current_time_ms;
         }
@@ -443,34 +353,4 @@ void MotorControllerSimulator::updateSimulation(uint32_t current_time_ms) {
     float base_voltage = 100.0f; // Could change depending on our real one
     float voltage_drop = state.bus_current_a * 0.2f;  // Internal resistance
     state.bus_voltage_v = base_voltage - voltage_drop;
-}
-
-extern "C" void app_main(void)
-{
-    // Initialize CAN driver
-    CanDriver can_driver;
-    can_driver.initialize();
-    
-    // Create motor controller simulator
-    MotorControllerSimulator motor_sim;
-    
-    ESP_LOGI(TAG, "WaveSculptor Motor Controller Simulator started");
-
-    while (true) {
-        uint32_t current_time_ms = pdTICKS_TO_MS(xTaskGetTickCount());
-        
-        // Process incoming commands
-        CanFrame received_frame;
-        if (can_driver.receive(received_frame, 1) == Result::R_SUCCESS) {
-            motor_sim.processIncomingCommand(received_frame);
-        }
-        
-        // Update simulation physics
-        motor_sim.updateSimulation(current_time_ms);
-        
-        // Send periodic messages
-        motor_sim.sendPeriodicMessages(current_time_ms, can_driver);
-        
-        vTaskDelay(pdMS_TO_TICKS(10)); // Prevent watchdog timeout
-    }
 }

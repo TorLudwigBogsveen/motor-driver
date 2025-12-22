@@ -7,7 +7,7 @@
 Clock::Clock() : startTime(0), endTime(0), running(false) {}
 
 void Clock::start() {
-    startTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+    startTime = std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     running = true;
 }
@@ -28,7 +28,7 @@ std::uint64_t Clock::elapsed_millis() const {
             std::chrono::high_resolution_clock::now().time_since_epoch()).count() : 
         endTime;
     
-    return static_cast<std::uint64_t>(end - startTime);
+    return static_cast<std::uint64_t>(end - startTime / 1000);
 }
 
 std::uint64_t Clock::elapsed_micros() const {
@@ -48,7 +48,7 @@ void Clock::busyWait(std::uint64_t milliseconds) const {
     auto start = std::chrono::high_resolution_clock::now();
     while (true) {
         auto now = std::chrono::high_resolution_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+        uint64_t elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
         if (elapsed >= milliseconds) {
             break;
         }

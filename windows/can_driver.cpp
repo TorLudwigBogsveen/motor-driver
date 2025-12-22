@@ -13,38 +13,53 @@ Result CanDriver::initialize() {
     sendPipe = CreateNamedPipeA(
         sendPipeName,
         PIPE_ACCESS_OUTBOUND,
-        PIPE_TYPE_BYTE | PIPE_WAIT,
-        PIPE_UNLIMITED_INSTANCES, bufferSize, 0, 0, nullptr
+        PIPE_TYPE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+        PIPE_UNLIMITED_INSTANCES,
+        bufferSize, bufferSize, 0, nullptr
     );
-    if(sendPipe == INVALID_HANDLE_VALUE) {
-        std::cout << "Failed to create send named pipe." << std::endl;
+    
+    if (sendPipe == INVALID_HANDLE_VALUE) {
+        std::cout << "Failed to create send named pipe. Error: "
+                << GetLastError() << std::endl;
         return Result::R_ERROR;
     }
 
     recvPipe = CreateNamedPipeA(
         recvPipeName,
         PIPE_ACCESS_INBOUND,
-        PIPE_TYPE_BYTE | PIPE_WAIT,
-        PIPE_UNLIMITED_INSTANCES, 0, bufferSize, 0, nullptr
+        PIPE_TYPE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+        PIPE_UNLIMITED_INSTANCES,
+        bufferSize, bufferSize, 0, nullptr
     );
 
-    if(recvPipe == INVALID_HANDLE_VALUE) {
-        std::cout << "Failed to create receive named pipe." << std::endl;
+    if (recvPipe == INVALID_HANDLE_VALUE) {
+        CloseHandle(sendPipe);
+        std::cout << "Failed to create receive named pipe. Error: "
+                << GetLastError() << std::endl;
         return Result::R_ERROR;
     }
 
     std::cout << "Waiting for Python client to connect..." << std::endl;
-    if(!ConnectNamedPipe(sendPipe, nullptr)) {
-        std::cout << "Failed to connect to send named pipe." << std::endl;
-        return Result::R_ERROR;
+
+    if (!ConnectNamedPipe(sendPipe, nullptr)) {
+        if (GetLastError() != ERROR_PIPE_CONNECTED) {
+            std::cout << "Failed to connect send pipe. Error: "
+                    << GetLastError() << std::endl;
+            return Result::R_ERROR;
+        }
     }
 
-    if(!ConnectNamedPipe(recvPipe, nullptr)) {
-        std::cout << "Failed to connect to receive named pipe." << std::endl;
-        return Result::R_ERROR;
+    std::cout << "Send pipe connected" << std::endl;
+
+    if (!ConnectNamedPipe(recvPipe, nullptr)) {
+        if (GetLastError() != ERROR_PIPE_CONNECTED) {
+            std::cout << "Failed to connect receive pipe. Error: "
+                    << GetLastError() << std::endl;
+            return Result::R_ERROR;
+        }
     }
 
-    std::cout << "Client connected. Sending CAN messages..." << std::endl;
+    std::cout << "Receive pipe connected" << std::endl;
     return Result::R_SUCCESS;
 }
 
@@ -70,27 +85,65 @@ Result CanDriver::transmit(const CanFrame& frame) {
     return Result::R_SUCCESS;
 }
 
-Result CanDriver::receive(CanFrame& out_frame, uint32_t timeout_ms) {
-    uint8_t receiveBuffer[13]; // 4 bytes ID + 1 byte DLC + 8 bytes data
-    DWORD bytesRead;
-    BOOL result = ReadFile(recvPipe, receiveBuffer, sizeof(receiveBuffer), &bytesRead, nullptr);
-    if(!result || bytesRead == 0) {
+Result CanDriver::receive(CanFrame& out_frame, uint32_t /*timeout_ms*/) {
+    constexpr DWORD FRAME_SIZE = 4 + 1 + 8; // ID + DLC + data
+    uint8_t receiveBuffer[FRAME_SIZE];
+
+    DWORD bytesAvailable = 0;
+    if (!PeekNamedPipe(
+            recvPipe,
+            nullptr,
+            0,
+            nullptr,
+            &bytesAvailable,
+            nullptr))
+    {
+        std::cout << "PeekNamedPipe failed. Error: "
+                  << GetLastError() << std::endl;
+        return Result::R_ERROR;
+    }
+
+    // No complete frame available → non-blocking return
+    if (bytesAvailable < FRAME_SIZE) {
         return Result::R_NO_MESSAGE;
     }
-    if(bytesRead < 5) { // At least ID + DLC
+
+    DWORD bytesRead = 0;
+    if (!ReadFile(
+            recvPipe,
+            receiveBuffer,
+            FRAME_SIZE,
+            &bytesRead,
+            nullptr))
+    {
+        std::cout << "ReadFile failed. Error: "
+                  << GetLastError() << std::endl;
         return Result::R_ERROR;
     }
+
+    if (bytesRead != FRAME_SIZE) {
+        return Result::R_ERROR;
+    }
+
     // Parse CAN ID
-    out_frame.id = *reinterpret_cast<uint32_t*>(receiveBuffer);
+    out_frame.id =
+        static_cast<uint32_t>(receiveBuffer[0]) |
+        (static_cast<uint32_t>(receiveBuffer[1]) << 8) |
+        (static_cast<uint32_t>(receiveBuffer[2]) << 16) |
+        (static_cast<uint32_t>(receiveBuffer[3]) << 24);
+
     // Parse DLC
     uint8_t dlc = receiveBuffer[4];
-    if(dlc > 8) {
+    if (dlc > 8) {
         return Result::R_ERROR;
     }
-    // Parse Data
-    for(int i = 0; i < dlc; i++) {
+
+    out_frame.dlc = dlc;
+
+    // Parse data
+    for (uint8_t i = 0; i < dlc; ++i) {
         out_frame.data[i] = receiveBuffer[5 + i];
     }
-    out_frame.dlc = dlc;
+
     return Result::R_SUCCESS;
 }

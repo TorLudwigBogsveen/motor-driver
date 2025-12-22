@@ -19,20 +19,10 @@ private:
   uint16_t buttonsJustChanged;
 };
 
-class Sliders {
-public:
-  Sliders(): sliders {} {}
-  void set(int slider, uint16_t value);
-  uint16_t get(int slider) const;
-private:
-  uint16_t sliders[NUM_POTENTIOMETERS];
-};
-
 class SmoothSliders {
 public:
   SmoothSliders(): sliders {} {}
-  void set(int slider, uint16_t value);
-  uint16_t get(int slider) const;
+  void set(int slider, float value);
   float getFloat(int slider) const;
 
   private:

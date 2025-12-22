@@ -6,15 +6,15 @@
 
 enum class MotorFlags : std::uint32_t {
   Success = 0,
-  MotorOverSpeed = (1 << 0),               // Motor Over Speed (15% overshoot above max RPM)
-  DesaturationFault = (1 << 1),            // Desaturation Fault (IGBT desaturation, IGBT driver OVLO)
-  Rail15vUnderVoltage = (1 << 2),          // 15V Rail under voltage lock out (UVLO)
-  ConfigReadError = (1 << 3),              // Config read error (some values may be reset to defaults)
+  HardwareOvercurrent = (1 << 0),          // Hardware over current
+  SoftwareOvercurrent = (1 << 1),          // Software over current
+  DcBusOvervoltage = (1 << 2),             // DC Bus over voltage
+  BadMotorPosition = (1 << 3),             // Bad motor position hall sequence
   WatchdogCausedLastReset = (1 << 4),      // Watchdog caused last reset
-  BadMotorPosition = (1 << 5),             // Bad motor position hall sequence
-  DcBusOvervoltage = (1 << 6),             // DC Bus over voltage
-  SoftwareOvercurrent = (1 << 7),          // Software over current
-  HardwareOvercurrent = (1 << 8),          // Hardware over current
+  ConfigReadError = (1 << 5),              // Config read error (some values may be reset to defaults)
+  Rail15vUnderVoltage = (1 << 6),          // 15V Rail under voltage lock out (UVLO)
+  DesaturationFault = (1 << 7),            // Desaturation Fault (IGBT desaturation, IGBT driver OVLO)
+  MotorOverSpeed = (1 << 8),               // Motor Over Speed (15% overshoot above max RPM)
   NotStationary = (1 << 9),                // Motor not stationary
   CannotSetMode = (1 << 10),               // Cannot set drive mode
   WrongDriveMode = (1 << 11),              // Drive mode not supported
@@ -53,7 +53,7 @@ enum class MotorLimit : std::uint32_t {
   BusCurrent = (1 << 3),
   BusVoltageUpperLimit = (1 << 4),
   BusVoltageLowerLimit = (1 << 5),
-  IpmOrMotorTemperature = (1 << 6),
+  IpmOrMotorTemperature = (1 << 6)
 };
 
 #endif

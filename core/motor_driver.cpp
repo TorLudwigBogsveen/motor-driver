@@ -4,7 +4,7 @@
 #include "protocol.hpp"
 #include "controller.hpp"
 
-CanDriver canDriver;
+CanDriver can_driver;
 Controller controller;
 unsigned long lastTime;
 unsigned long lastSerialTime;
@@ -12,7 +12,7 @@ unsigned long lastDriveCommandTime;
 
 void readCanMessages(Controller& controller) {
   CanFrame m;
-  if (canDriver.receive(m) == Result::R_SUCCESS) {
+  if (can_driver.receive(m) == Result::R_SUCCESS) {
     switch(m.id) {
       case ID_STATUS_INFORMATION: {
         StatusInformation status = StatusInformation(m);
@@ -72,7 +72,7 @@ void readCanMessages(Controller& controller) {
 }
 
 void setup() {
-  canDriver.initialize();
+  can_driver.initialize();
   //delay(1000);
 
   //lastTime = millis();

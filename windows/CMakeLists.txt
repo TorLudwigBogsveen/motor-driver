@@ -10,9 +10,11 @@ add_executable(${PROJECT_NAME}
     ../core/error.cpp
     ../core/input.cpp
     ../core/controller.cpp
+    ../core/wavesculptor_simulator.cpp
     ../windows/main.cpp
     ../windows/can_driver.cpp
     ../windows/clock.cpp
+    ../windows/log.cpp
 )
 
 # Include directories
