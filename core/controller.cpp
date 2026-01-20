@@ -22,24 +22,6 @@ constexpr float POT_DEAD_ZONE_THRESHOLD = 5.0f;
 #define CRUISE_VELOCITY_TIME_TO_CHANGE 100000 //Time in microseconds
 #define MOTOR_TIMEOUT 4000
 
-/*
-  SERIAL BUTTON BIT
-*/
-
-#define ON_OFF_SWITCH_BIT (1 << 0)
-#define FORWARD_DIRECTION_SWITCH_BIT (1 << 1)
-#define CRUISE_SWITCH_BIT (1 << 2)
-#define CRUISE_ACCELERATE_SWITCH_BIT (1 << 3)
-#define CRUISE_DEACCELERATE_SWITCH_BIT (1 << 4)
-#define DRIVE_MODE_SWITCH_BIT (1 << 5)
-#define INDICATOR_LEFT_SWITCH_BIT (1 << 6)
-#define INDICATOR_RIGHT_SWITCH_BIT (1 << 7)
-#define INDICATOR_BREAK_SWITCH_BIT (1 << 8)
-#define LCD_MODE_SWITCH_BIT (1 << 9)
-#define NEUTRAL_DIRECTION_SWITCH_BIT (1 << 10)
-#define BACKWARD_DIRECTION_SWITCH_BIT (1 << 11)
-#define PARK_SWITCH_BIT (1 << 12)
-
 const int numDriveModes = 3;
 const DriveMode driveModes[numDriveModes] = {DriveMode::Current, DriveMode::Velocity, DriveMode::Custom1};
 
@@ -127,7 +109,7 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 		result |= setMotorControllerConnected(true);
 	}
 
-	if(buttons.get(NEUTRAL_DIRECTION_SWITCH_BIT)) {
+	if(buttons.get(DASHBOARD_BUTTON_REVERSE)) {
 		result |= setDirection(MotorDirection::Neutral);
 	}
 	else if(buttons.get(FORWARD_DIRECTION_SWITCH_BIT)) {
@@ -554,64 +536,69 @@ void Controller::processIncomingCommand(const CanFrame &frame)
     {
     case ID_STATUS_INFORMATION:
     {
-        StatusInformation status = StatusInformation(frame);
+        StatusInformation status(frame);
         setError(static_cast<MotorFlags>(status.error_flags & 0x1ff)); // mask to remove unwanted reserved bits
         setLimit(status.limit_flags & 0x7f);                           // mask to remove unwanted reserved bits
         break;
     }
     case ID_BUS_MEASUREMENT:
     {
-        BusMeasurement bm = BusMeasurement(frame);
+        BusMeasurement bm(frame);
         setBusCurrent(bm.bus_current);
         break;
     }
     case ID_VELOCITY_MEASUREMENT:
     {
-        VelocityMeasurement vm = VelocityMeasurement(frame);
+        VelocityMeasurement vm(frame);
         setVelocity(vm.vehicle_velocity);
         setMotorVelocity(vm.motor_velocity_rpm);
         break;
     }
     case ID_PHASE_CURRENT_MEASUREMENT:
     {
-        PhaseCurrentMeasurement pcm = PhaseCurrentMeasurement(frame);
+        PhaseCurrentMeasurement pcm(frame);
         break;
     }
     case ID_MOTOR_VOLTAGE_VECTOR_MEASUREMENT:
     {
-        MotorVoltageVectorMeasurement vvm = MotorVoltageVectorMeasurement(frame);
+        MotorVoltageVectorMeasurement vvm(frame);
         break;
     }
     case ID_MOTOR_CURRENT_VECTOR_MEASUREMENT:
     {
-        MotorCurrentVectorMeasurement cvm = MotorCurrentVectorMeasurement(frame);
+        MotorCurrentVectorMeasurement cvm(frame);
 
         break;
     }
     case ID_HEATSINK_AND_MOTOR_TEMPERATURE_MEASUREMENT:
     {
-        HeatsinkAndMotorTemperatureMeasurement temp = HeatsinkAndMotorTemperatureMeasurement(frame);
+        HeatsinkAndMotorTemperatureMeasurement temp(frame);
         setHeatSinkTemp(temp.heat_sink_temp);
         setMotorTemp(temp.motor_temp);
         break;
     }
     case ID_DSP_BOARD_TEMPERATURE_MEASUREMENT:
     {
-        DSPBoardTemperatureMeasurement temp = DSPBoardTemperatureMeasurement(frame);
+        DSPBoardTemperatureMeasurement temp(frame);
         setDspBoardTemp(temp.DSP_board_temp);
         break;
     }
     case ID_ODOMETER_AND_BUS_AMP_HOURS_MEASUREMENT:
     {
-        OdometerAndBusAmpHoursMeasurement om = OdometerAndBusAmpHoursMeasurement(frame);
+        OdometerAndBusAmpHoursMeasurement om(frame);
         setOdometer(om.odometer);
         break;
     }
     case ID_SLIP_SPEED_MEASUREMENT:
     {
-        SlipSpeedMeasurement ssm = SlipSpeedMeasurement(frame);
+        SlipSpeedMeasurement ssm(frame);
         break;
     }
+	case ID_ACCELEROMETER_PERCENTAGE:
+	{
+		DriverAccelerometer da(frame);
+		sliders.set(ACCELERATION_POTENTIOMETER, da.acceleration);
+	}
     default:
         // TODO FIX
         break;
@@ -623,8 +610,6 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 		return;
 	}
 
-	
-	
 	lastSentDriveCommand = current_time_ms;
 	SpeedCommand command = motorCommand();
     MotorDriveCommand cmd(command.current, command.velocity);

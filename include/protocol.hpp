@@ -22,6 +22,7 @@ static_assert(std::numeric_limits<float>::is_iec559, "Platform must use IEEE 754
 // BASE ADDRESSES (Configured in the software for Wave Sculptor motor controller)
 constexpr uint32_t DRIVER_CONTROLS_BASE_ADDRESS  = 0x500; ///< Base address for driver control commands
 constexpr uint32_t MOTOR_CONTROLLER_BASE_ADDRESS = 0x400; ///< Base address for motor controller messages
+constexpr uint32_t ESP32_BASE_ADRESS = 0x600; ///< Base address for ESP32
 
 // CAN Message Identifiers for Drive Commands
 constexpr uint32_t ID_MOTOR_DRIVE_COMMAND = DRIVER_CONTROLS_BASE_ADDRESS + 0x01;   ///< Motor Controller Command, WaveSculptor22 motor controller must receive a Motor Drive Command frame at least once every 250ms!
@@ -49,6 +50,10 @@ constexpr uint32_t ID_SLIP_SPEED_MEASUREMENT 				 = MOTOR_CONTROLLER_BASE_ADDRES
 // CAN Message Identifiers for Configuration Commands
 constexpr uint32_t ID_ACTIVE_MOTOR_CHANGE = MOTOR_CONTROLLER_BASE_ADDRESS + 0x12; ///< Active Motor Change, send this command to change the active motor (if multiple motors are configured)
 
+constexpr uint32_t ID_ACCELEROMETER_PERCENTAGE = ESP32_BASE_ADRESS + 0x0;
+constexpr uint32_t ID_DASHBOARD_BUTTONS = ESP32_BASE_ADRESS + 0x1;
+constexpr uint32_t ID_DASHBOARD_REGEN = ESP32_BASE_ADRESS + 0x2;
+
 // Forward Declarations of domain structs for CAN messages
 struct MotorDriveCommand;
 struct MotorPowerCommand;
@@ -71,6 +76,10 @@ struct SlipSpeedMeasurement;
 
 struct ActiveMotorChangeCommand;
 
+struct DriverAccelerometer;
+struct DashboardButtons;
+struct DashboardRegen;
+
 // Forward Declarations of serialization functions
 CanFrame pack(const MotorDriveCommand& cmd);
 CanFrame pack(const MotorPowerCommand& cmd);
@@ -92,6 +101,12 @@ CanFrame pack(const OdometerAndBusAmpHoursMeasurement& measurement);
 CanFrame pack(const SlipSpeedMeasurement& measurement);
 
 CanFrame pack(const ActiveMotorChangeCommand& cmd);
+
+CanFrame pack(const DriverAccelerometer& cmd);
+CanFrame pack(const DashboardButtons& cmd);
+CanFrame pack(const DashboardRegen& cmd);
+
+
 
 // ============================================================================
 // STRUCT DEFINITIONS
@@ -349,6 +364,43 @@ struct ActiveMotorChangeCommand {
 	explicit ActiveMotorChangeCommand(uint16_t motor_index) : active_motor{motor_index}, access_key{'A', 'C', 'T', 'M', 'O', 'T'} {}
 };
 
+/// @brief Driver accelerometer data message for motor controller
+/// @note Contains the acceleration value from the driver's input device (e.g., pedal position)
+/// @warning Value should be in percentage (0-100%) eg 0.0f to 1.0f
+struct DriverAccelerometer {
+	float acceleration; ///< (Units percentage) Driver acceleration value
+
+	/// @brief Construct from CAN frame (deserialize)
+	explicit DriverAccelerometer(const CanFrame& frame);
+};
+
+constexpr uint8_t DASHBOARD_BUTTONS_COUNT = 16; ///< Number of dashboard buttons represented in the bitfield
+constexpr uint16_t DASHBOARD_BUTTON_INDICATOR_LEFT = 0x0001;  ///< Bit 0: Left Indicator
+constexpr uint16_t DASHBOARD_BUTTON_INDICATOR_RIGHT = 0x0002; ///< Bit 1: Right Indicator
+constexpr uint16_t DASHBOARD_BUTTON_HORN = 0x0004;            ///< Bit 2: Horn
+constexpr uint16_t DASHBOARD_BUTTON_HEADLIGHTS = 0x0008;      ///< Bit 3: Headlights
+constexpr uint16_t DASHBOARD_BUTTON_CRUISE_CONTROL = 0x0010;   ///< Bit 4: Cruise Control
+constexpr uint16_t DASHBOARD_BUTTON_REVERSE = 0x0020;          ///< Bit 5: Reverse
+
+/// @brief Dashboard button states
+/// @note Each bit corresponds to a button state
+struct DashboardButtons {
+	uint16_t button_states; ///< Bitfield representing the states of dashboard buttons
+
+	/// @brief Construct from CAN frame (deserialize)
+	explicit DashboardButtons(const CanFrame& frame);
+};
+
+/// @brief Regen requested
+/// @note Regen and it's maximum value
+struct DashboardRegen {
+	float regen_breaking; ///< (Units percentage) regen between (0-100%) eg 0.0f to 1.0f	
+	float regen_max; ///< (Units percentage) regen between (0-100%) eg 0.0f to 1.0f	
+
+	/// @brief Construct from CAN frame (deserialize)
+	explicit DashboardRegen(const CanFrame& frame);
+};
+
 // ============================================================================
 // DESERIALIZATION IMPLEMENTATIONS (CAN frames -> Domain Structs)
 // ============================================================================
@@ -459,6 +511,20 @@ inline ActiveMotorChangeCommand::ActiveMotorChangeCommand(const CanFrame& frame)
     
     std::memcpy(&active_motor, &frame.data[6], sizeof(uint16_t));
 }
+
+inline DriverAccelerometer::DriverAccelerometer(const CanFrame& frame) {
+    std::memcpy(&acceleration, &frame.data[4], sizeof(float));
+}
+
+inline DashboardButtons::DashboardButtons(const CanFrame& frame) {
+    std::memcpy(&button_states, &frame.data[0], sizeof(uint16_t));
+}
+
+inline DashboardRegen::DashboardRegen(const CanFrame& frame) {
+    std::memcpy(&regen_breaking, &frame.data[0], sizeof(float));
+	std::memcpy(&regen_max, &frame.data[4], sizeof(float));
+}
+
 
 // ============================================================================
 // SERIALIZATION FUNCTIONS (Domain Structs -> CAN frames)
@@ -630,6 +696,33 @@ inline CanFrame pack(const ActiveMotorChangeCommand& cmd) {
 	frame.data[4] = cmd.access_key[4];
 	frame.data[5] = cmd.access_key[5];
 	std::memcpy(&frame.data[6], &cmd.active_motor, sizeof(uint16_t));
+	return frame;
+}
+
+inline CanFrame pack(const DriverAccelerometer& da) {
+	CanFrame frame{};
+	frame.id = ID_ACCELEROMETER_PERCENTAGE;
+	frame.dlc = 8;
+	std::memset(frame.data, 0, 4);
+	std::memcpy(&frame.data[4], &da.acceleration, sizeof(float));
+	return frame;
+}
+
+inline CanFrame pack(const DashboardButtons& db) {
+	CanFrame frame{};
+	frame.id = ID_DASHBOARD_BUTTONS;
+	frame.dlc = 8;
+	std::memcpy(&frame.data[0], &db.button_states, sizeof(uint16_t));
+	std::memset(&frame.data[4], 0, 4);
+	return frame;
+}
+
+inline CanFrame pack(const DashboardRegen& dr) {
+	CanFrame frame{};
+	frame.id = ID_DASHBOARD_REGEN;
+	frame.dlc = 8;
+	std::memcpy(&frame.data[0], &dr.regen_breaking, sizeof(float));
+	std::memcpy(&frame.data[4], &dr.regen_max, sizeof(float));
 	return frame;
 }
 
