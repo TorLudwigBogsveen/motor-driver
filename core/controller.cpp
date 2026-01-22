@@ -582,8 +582,12 @@ void Controller::processIncomingCommand(const CanFrame &frame)
     }
 	case ID_ACCELEROMETER_PERCENTAGE:
 	{
+		for (int i = 0; i < 8; i++) {
+			std::cout << std::hex << static_cast<int>(frame.data[i]) << " ";
+		}
 		DriverAccelerometer da(frame);
 		sliders.set(ACCELERATION_POTENTIOMETER, da.acceleration);
+		//std::cout << "Received Accelerometer Value: " << da.acceleration << std::endl;
 	}
     default:
         // TODO FIX
@@ -600,7 +604,7 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 	SpeedCommand command = motorCommand();
     MotorDriveCommand cmd(command.current, command.velocity);
 
-	std::cout << "Motor Driver Running..." << std::endl;
+	/*std::cout << "Motor Driver Running..." << std::endl;
 	std::cout << "Target Current: " << command.current << " Target Velocity: " << command.velocity << std::endl;
 	std::cout << "Actual Velocity: " << getMotorVelocity() << " Odometer: " << getOdometer() << std::endl;
 	std::cout << "Heat Sink Temp: " << getHeatSinkTemp() << " Motor Temp: " << getMotorTemp() << " DSP Temp: " << getDspBoardTemp() << std::endl;
@@ -609,7 +613,7 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 	std::cout << "Controller State: " << int(getState()) << std::endl;
 	std::cout << "-----------------------------" << std::endl;
 
-	std::cout << "Sending Command - Current: " << command.current << ", Velocity: " << command.velocity << std::endl;
+	std::cout << "Sending Command - Current: " << command.current << ", Velocity: " << command.velocity << std::endl;*/
 
     (transmit_func)(pack(cmd), t_state);	
 }

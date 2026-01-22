@@ -515,7 +515,7 @@ inline ActiveMotorChangeCommand::ActiveMotorChangeCommand(const CanFrame& frame)
 }
 
 inline DriverAccelerometer::DriverAccelerometer(const CanFrame& frame) {
-    std::memcpy(&acceleration, &frame.data[4], sizeof(float));
+    std::memcpy(&acceleration, &frame.data[0], sizeof(float));
 }
 
 inline DashboardButtons::DashboardButtons(const CanFrame& frame) {

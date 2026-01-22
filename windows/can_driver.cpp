@@ -67,21 +67,28 @@ Result CanDriver::transmit(const CanFrame& frame) {
 
     uint8_t dlc = 8;
     DWORD bytesWritten;
-    // Write CAN ID
-    if(!WriteFile(sendPipe, &frame.id, sizeof(frame.id), &bytesWritten, nullptr))
-        return Result::R_ERROR;
-    // Write DLC
-    if(!WriteFile(sendPipe, &dlc, sizeof(dlc), &bytesWritten, nullptr))
-        return Result::R_ERROR;
-    // Write Data
-    if(!WriteFile(sendPipe, frame.data, sizeof(frame.data), &bytesWritten, nullptr))
-        return Result::R_ERROR;
+    uint8_t buffer[13];
+    memcpy(buffer, &frame.id, 4);
+    buffer[4] = dlc;
+    memcpy(buffer + 5, frame.data, 8);
 
-    std::cout << "Sent CAN Frame - ID: " << frame.id << " DLC: " << static_cast<int>(dlc) << " Data: ";
-    for(int i = 0; i < dlc; i++) {
-        std::cout << std::hex << static_cast<int>(frame.data[i]) << " ";
+    if (!WriteFile(
+            sendPipe,
+            buffer,
+            13,
+            &bytesWritten,
+            nullptr))
+    {
+        std::cout << "WriteFile failed. Error: "
+                << GetLastError() << std::endl;
+        return Result::R_ERROR;
     }
-    std::cout << std::dec << std::endl;
+
+    //std::cout << "Sent CAN Frame - ID: " << frame.id << " DLC: " << static_cast<int>(dlc) << " Data: ";
+    //for(int i = 0; i < dlc; i++) {
+        //std::cout << std::hex << static_cast<int>(frame.data[i]) << " ";
+    //}
+    //std::cout << std::dec << std::endl;
     return Result::R_SUCCESS;
 }
 
