@@ -109,13 +109,13 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 		result |= setMotorControllerConnected(true);
 	}
 
-	if(buttons.get(DASHBOARD_BUTTON_REVERSE)) {
+	if(buttons.get(DASHBOARD_BUTTON_NEUTRAL)) {
 		result |= setDirection(MotorDirection::Neutral);
 	}
-	else if(buttons.get(FORWARD_DIRECTION_SWITCH_BIT)) {
+	else if(buttons.get(DASHBOARD_BUTTON_FORWARD)) {
 		result |= setDirection(MotorDirection::Forward);
 	}
-	else if(buttons.get(BACKWARD_DIRECTION_SWITCH_BIT)) {
+	else if(buttons.get(DASHBOARD_BUTTON_REVERSE)) {
 		result |= setDirection(MotorDirection::Backward);
 	}
 
@@ -124,13 +124,13 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 		std::cout << "Error setting direction: " << static_cast<int>(result) << std::endl;
 	}
 
-	if(buttons.getJustPressed(CRUISE_SWITCH_BIT)) {
+	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
 		MotorFlags result = toggleCruise();
 		if (result != MotorFlags::Success) {
 			std::cout << "Error toggling cruise: " << static_cast<int>(result) << std::endl;
 		}
 	}
-	if(buttons.getJustPressed(DRIVE_MODE_SWITCH_BIT)) {
+	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
 		swapNextDriveMode();
 	}
 	
@@ -492,20 +492,6 @@ void Controller::stateVelocityDrive() {
 }
 
 void Controller::stateCruise() {
-	static unsigned long timeHeld = 0;
-	
-	if(buttons.get(CRUISE_ACCELERATE_SWITCH_BIT) && !buttons.get(CRUISE_DEACCELERATE_SWITCH_BIT)) {
-		timeHeld += deltaTime;
-		setTargetMotorVelocity(targetMotorVelocity + timeHeld / CRUISE_VELOCITY_TIME_TO_CHANGE);
-		timeHeld = timeHeld % CRUISE_VELOCITY_TIME_TO_CHANGE;
-	} else if(!buttons.get(CRUISE_ACCELERATE_SWITCH_BIT) && buttons.get(CRUISE_DEACCELERATE_SWITCH_BIT)) {
-		timeHeld += deltaTime;
-		setTargetMotorVelocity(std::max(targetMotorVelocity - timeHeld / CRUISE_VELOCITY_TIME_TO_CHANGE, 0.0f));
-		timeHeld = timeHeld % CRUISE_VELOCITY_TIME_TO_CHANGE;
-	} else {
-		timeHeld = 0;
-	}
-
 	if (abs(motorVelocity) < targetMotorVelocity) {
 		setTargetMotorCurrentPercentage(MAX_FORWARD_CURRENT);
 	} else {
@@ -515,8 +501,8 @@ void Controller::stateCruise() {
 
 void Controller::stateCustom1() {
 	float pedal = sliders.getFloat(ACCELERATION_POTENTIOMETER);
-	float mid = 0.5;
-	float dead = 0.05;
+	float mid = 0.5f;
+	float dead = 0.05f;
 
 	if (pedal > mid + dead) {      // accelerate
 		float frac = (pedal - mid) / mid;

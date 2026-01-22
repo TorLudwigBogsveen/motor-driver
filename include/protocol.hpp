@@ -380,7 +380,9 @@ constexpr uint16_t DASHBOARD_BUTTON_INDICATOR_RIGHT = 0x0002; ///< Bit 1: Right 
 constexpr uint16_t DASHBOARD_BUTTON_HORN = 0x0004;            ///< Bit 2: Horn
 constexpr uint16_t DASHBOARD_BUTTON_HEADLIGHTS = 0x0008;      ///< Bit 3: Headlights
 constexpr uint16_t DASHBOARD_BUTTON_CRUISE_CONTROL = 0x0010;   ///< Bit 4: Cruise Control
-constexpr uint16_t DASHBOARD_BUTTON_REVERSE = 0x0020;          ///< Bit 5: Reverse
+constexpr uint16_t DASHBOARD_BUTTON_FORWARD = 0x0020;          ///< Bit 5: Forward
+constexpr uint16_t DASHBOARD_BUTTON_REVERSE = 0x0040;          ///< Bit 6: Reverse
+constexpr uint16_t DASHBOARD_BUTTON_NEUTRAL = 0x0080;          ///< Bit 7: Neutral
 
 /// @brief Dashboard button states
 /// @note Each bit corresponds to a button state
