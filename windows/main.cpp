@@ -12,7 +12,7 @@ CanDriver can_driver;
 Controller controller;
 
 // Create motor controller simulator
-//MotorControllerSimulator motor_sim;
+MotorControllerSimulator motor_sim;
 
 Clock controller_clock;
 
@@ -24,11 +24,11 @@ void loop()
     while (can_driver.receive(m) == Result::R_SUCCESS)
     {
         controller.processIncomingCommand(m);
-        // motor_sim.processIncomingCommand(m);
+        motor_sim.processIncomingCommand(m);
     }
 
     // Update simulation physics
-    // motor_sim.updateSimulation(static_cast<uint32_t>(controller_clock.elapsed_millis()));
+    motor_sim.updateSimulation(static_cast<uint32_t>(controller_clock.elapsed_millis()));
     auto sim_can = [](const CanFrame &frame, void *t_state)
     {
         CanDriver *driver = static_cast<CanDriver *>(t_state);
@@ -37,16 +37,8 @@ void loop()
     };
 
     // Send periodic messages
-    //motor_sim.sendPeriodicMessages(static_cast<uint32_t>(controller_clock.elapsed_millis()), &can_driver, sim_can);
+    motor_sim.sendPeriodicMessages(static_cast<uint32_t>(controller_clock.elapsed_millis()), &can_driver, sim_can);
 
-    auto &buttons = controller.getButtonsMut();
-    buttons.update();
-    auto &sliders = controller.getSlidersMut();
-    // sliders.set(ACCELERATION_POTENTIOMETER, ioState.getPotentiometerValue(ACCELERATION_POTENTIOMETER));
-    // sliders.set(REGENERATION_POTENTIOMETER, ioState.getPotentiometerValue(REGENERATION_POTENTIOMETER));
-    int oldVal = sliders.getFloat(0);
-    // int val = min(max(analogRead(34) - 1000, 0) / 3, MAX_POT_VALUE);
-    // sliders.set(0, val);
     controller.update(static_cast<uint32_t>(controller_clock.elapsed_millis()), static_cast<uint32_t>(controller_clock.elapsed_micros()));
     controller.setDirection(MotorDirection::Forward);
 
@@ -54,7 +46,7 @@ void loop()
     {
         CanDriver *driver = static_cast<CanDriver *>(t_state);
         driver->transmit(frame);
-        //motor_sim.processIncomingCommand(frame);
+        motor_sim.processIncomingCommand(frame);
     };
 
     // Send periodic messages

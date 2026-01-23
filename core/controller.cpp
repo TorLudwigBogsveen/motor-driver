@@ -135,7 +135,7 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	}
 	
 	if(heatSinkTemp > MAX_TEMP || dspBoardTemp > MAX_TEMP || motorTemp > MAX_TEMP) {
-		setError(MotorFlags::Overheat);
+		setError(MotorFlags::ControllerError);
 	}
 
 	switch (state) {
@@ -523,7 +523,9 @@ void Controller::processIncomingCommand(const CanFrame &frame)
     case ID_STATUS_INFORMATION:
     {
         StatusInformation status(frame);
-        setError(static_cast<MotorFlags>(status.error_flags & 0x1ff)); // mask to remove unwanted reserved bits
+		if (status.error_flags != 0) {
+			setError(MotorFlags::ControllerError);
+		}
         setLimit(status.limit_flags & 0x7f);                           // mask to remove unwanted reserved bits
         break;
     }
@@ -603,6 +605,11 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 	lastSentDriveCommand = current_time_ms;
 	SpeedCommand command = motorCommand();
     MotorDriveCommand cmd(command.current, command.velocity);
+
+	DriverError error;
+	error.error = static_cast<uint16_t>(getError());
+
+	(transmit_func)(pack(error), t_state);
 
 	/*std::cout << "Motor Driver Running..." << std::endl;
 	std::cout << "Target Current: " << command.current << " Target Velocity: " << command.velocity << std::endl;

@@ -8,6 +8,7 @@
 /// @param ... Additional arguments for the format string
 
 void log(const char* tag, const char* format, ...); 
+
 /// @brief Simple warning logging functions for the simulator
 /// @param tag Tag string to identify the log source
 /// @param format printf-style format string

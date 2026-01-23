@@ -53,6 +53,8 @@ constexpr uint32_t ID_ACTIVE_MOTOR_CHANGE = MOTOR_CONTROLLER_BASE_ADDRESS + 0x12
 constexpr uint32_t ID_ACCELEROMETER_PERCENTAGE = ESP32_BASE_ADRESS + 0x0;
 constexpr uint32_t ID_DASHBOARD_BUTTONS = ESP32_BASE_ADRESS + 0x1;
 constexpr uint32_t ID_DASHBOARD_REGEN = ESP32_BASE_ADRESS + 0x2;
+constexpr uint32_t ID_DRIVER_ERROR = ESP32_BASE_ADRESS + 0x3;
+
 
 // Forward Declarations of domain structs for CAN messages
 struct MotorDriveCommand;
@@ -77,6 +79,7 @@ struct SlipSpeedMeasurement;
 struct ActiveMotorChangeCommand;
 
 struct DriverAccelerometer;
+struct DriverError;
 struct DashboardButtons;
 struct DashboardRegen;
 
@@ -102,6 +105,7 @@ CanFrame pack(const SlipSpeedMeasurement& measurement);
 
 CanFrame pack(const ActiveMotorChangeCommand& cmd);
 
+CanFrame pack(const DriverError& cmd);
 CanFrame pack(const DriverAccelerometer& cmd);
 CanFrame pack(const DashboardButtons& cmd);
 CanFrame pack(const DashboardRegen& cmd);
@@ -374,6 +378,17 @@ struct DriverAccelerometer {
 	explicit DriverAccelerometer(const CanFrame& frame);
 };
 
+/// @brief Driver error message for motor controller
+/// @note Contains the error code from the driver's input device
+struct DriverError {
+	uint16_t error; ///< error code
+
+	DriverError() : error{0} {}
+
+	/// @brief Construct from CAN frame (deserialize)
+	explicit DriverError(const CanFrame& frame);
+};
+
 constexpr uint8_t DASHBOARD_BUTTONS_COUNT = 16; ///< Number of dashboard buttons represented in the bitfield
 constexpr uint16_t DASHBOARD_BUTTON_INDICATOR_LEFT = 0x0001;  ///< Bit 0: Left Indicator
 constexpr uint16_t DASHBOARD_BUTTON_INDICATOR_RIGHT = 0x0002; ///< Bit 1: Right Indicator
@@ -527,6 +542,9 @@ inline DashboardRegen::DashboardRegen(const CanFrame& frame) {
 	std::memcpy(&regen_max, &frame.data[4], sizeof(float));
 }
 
+inline DriverError::DriverError(const CanFrame& frame) {
+	std::memcpy(&error, &frame.data[0], sizeof(uint16_t));
+}
 
 // ============================================================================
 // SERIALIZATION FUNCTIONS (Domain Structs -> CAN frames)
@@ -725,6 +743,15 @@ inline CanFrame pack(const DashboardRegen& dr) {
 	frame.dlc = 8;
 	std::memcpy(&frame.data[0], &dr.regen_breaking, sizeof(float));
 	std::memcpy(&frame.data[4], &dr.regen_max, sizeof(float));
+	return frame;
+}
+
+inline CanFrame pack(const DriverError& de) {
+	CanFrame frame{};
+	frame.id = ID_DRIVER_ERROR;
+	frame.dlc = 8;
+	std::memcpy(&frame.data[0], &de.error, sizeof(uint16_t));
+	std::memset(&frame.data[4], 0, 4);
 	return frame;
 }
 
