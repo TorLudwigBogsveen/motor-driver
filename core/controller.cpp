@@ -1,7 +1,7 @@
 //# Copyright (c) 2025 MDU Solar Team
 #include "controller.hpp"
-#include <cmath>
-#include <iostream>
+#include <algorithm>
+#include "log.hpp"
 
 constexpr float POT_DEAD_ZONE_THRESHOLD = 5.0f;
 
@@ -103,8 +103,8 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	if(timeSinceMotorDataReceived > (uint32_t)MOTOR_TIMEOUT*10000) { //timeSinceMotorDataReceived is in micros while MOTOR_TIMEOUT is in millis
 		result |= setMotorControllerConnected(false);
 		setError(MotorFlags::Timeout);
-		std::cout << "Delta time: " << deltaTime << std::endl;
-		std::cout << "Motor Controller Timeout" << timeSinceMotorDataReceived << ":" << MOTOR_TIMEOUT*10000 << std::endl;
+		log("CONTROLLER", "Delta time: %d", deltaTime);
+		log("CONTROLLER", "Motor Controller Timeout %d:%d", timeSinceMotorDataReceived, MOTOR_TIMEOUT*10000);
 	} else {
 		result |= setMotorControllerConnected(true);
 	}
@@ -121,13 +121,13 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 
 	if(result != MotorFlags::Success) {
 		setError(result);
-		std::cout << "Error setting direction: " << static_cast<int>(result) << std::endl;
+		log("CONTROLLER", "Error setting direction: %d", static_cast<int>(result));
 	}
 
 	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
 		MotorFlags result = toggleCruise();
 		if (result != MotorFlags::Success) {
-			std::cout << "Error toggling cruise: " << static_cast<int>(result) << std::endl;
+			log("CONTROLLER", "Error toggling cruise: %d", static_cast<int>(result));
 		}
 	}
 	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
@@ -233,7 +233,7 @@ MotorFlags Controller::setState(ControllerState state) {
 			return setError(MotorFlags::CannotSetMode);
 		case ControllerState::Error:
 			this->state = ControllerState::Error;
-			std::cout << "Controller entered Error state" << std::endl;
+			log("CONTROLLER", "Controller entered Error state");
 			break;
 		case ControllerState::Running:
 			if (!isStationary() && isAccelerometerOff()) return setError(MotorFlags::NotStationary);
@@ -333,7 +333,7 @@ MotorFlags Controller::getError() const {
 MotorFlags Controller::clearError() {
 	if (error == MotorFlags::Success)
 		return MotorFlags::Success;
-	std::cout << "Clearing error state from: " << static_cast<int>(error) << std::endl;
+	log("CONTROLLER", "Clearing error state from: %d", static_cast<int>(error));
 	state = ControllerState::Startup;
 	error = MotorFlags::Success;
 	return MotorFlags::Success;
@@ -458,7 +458,7 @@ void Controller::stateError() {
 
 void Controller::stateCurrentDrive() {
 	if (direction == MotorDirection::Forward) {
-		std::cout << "Forward Current Drive, slider value: " << sliders.getFloat(ACCELERATION_POTENTIOMETER) << std::endl; 
+		log("CONTROLLER", "Forward Current Drive, slider value: %f", sliders.getFloat(ACCELERATION_POTENTIOMETER));
 		setTargetMotorCurrentPercentage(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_CURRENT);
 		setTargetMotorVelocity(MAX_FORWARD_VELOCITY);
 	}
@@ -470,24 +470,24 @@ void Controller::stateCurrentDrive() {
 
 void Controller::stateVelocityDrive() {  
 	float maxCurrent;
-	std::cout << "Velocity Drive, slider value: " << sliders.getFloat(ACCELERATION_POTENTIOMETER) << std::endl;
-	std::cout << sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_VELOCITY << std::endl;
+	log("CONTROLLER", "Velocity Drive, slider value: %f", sliders.getFloat(ACCELERATION_POTENTIOMETER));
+	log("CONTROLLER", "%f * %f = %f", sliders.getFloat(ACCELERATION_POTENTIOMETER), MAX_FORWARD_VELOCITY, sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_VELOCITY);
 	if (direction == MotorDirection::Forward) {
 		setTargetMotorVelocity(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_VELOCITY);
 		maxCurrent = MAX_FORWARD_CURRENT;
-		std::cout << "Target Velocity: " << targetMotorVelocity << std::endl;
+		log("CONTROLLER", "Target Velocity: %f", targetMotorVelocity);
 	}
 	else if (direction == MotorDirection::Backward) {
 		setTargetMotorVelocity(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_BACKWARD_VELOCITY);
 		maxCurrent = MAX_BACKWARD_CURRENT;
-		std::cout << "Target Velocity: " << targetMotorVelocity << std::endl;
+		log("CONTROLLER", "Target Velocity: %f", targetMotorVelocity);
 	}
 	if (abs(motorVelocity) < targetMotorVelocity) {
 		setTargetMotorCurrentPercentage(maxCurrent);
-		std::cout << "Setting max current for acceleration: " << maxCurrent << std::endl;
+		log("CONTROLLER", "Setting max current for acceleration: %f", maxCurrent);
 	} else {
 		setTargetMotorCurrentPercentage(maxCurrent * regenMultiplier);
-		std::cout << "Setting regen current: " << maxCurrent * regenMultiplier << std::endl;
+		log("CONTROLLER", "Setting regen current: %f", maxCurrent * regenMultiplier);
 	}
 }
 
@@ -585,11 +585,11 @@ void Controller::processIncomingCommand(const CanFrame &frame)
 	case ID_ACCELEROMETER_PERCENTAGE:
 	{
 		for (int i = 0; i < 8; i++) {
-			std::cout << std::hex << static_cast<int>(frame.data[i]) << " ";
+			log("CONTROLLER", "%02x ", static_cast<int>(frame.data[i]));
 		}
 		DriverAccelerometer da(frame);
 		sliders.set(ACCELERATION_POTENTIOMETER, da.acceleration);
-		//std::cout << "Received Accelerometer Value: " << da.acceleration << std::endl;
+		//log("CONTROLLER", "Received Accelerometer Value: %f", da.acceleration);
 	}
     default:
         // TODO FIX
@@ -610,17 +610,5 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 	error.error = static_cast<uint16_t>(getError());
 
 	(transmit_func)(pack(error), t_state);
-
-	/*std::cout << "Motor Driver Running..." << std::endl;
-	std::cout << "Target Current: " << command.current << " Target Velocity: " << command.velocity << std::endl;
-	std::cout << "Actual Velocity: " << getMotorVelocity() << " Odometer: " << getOdometer() << std::endl;
-	std::cout << "Heat Sink Temp: " << getHeatSinkTemp() << " Motor Temp: " << getMotorTemp() << " DSP Temp: " << getDspBoardTemp() << std::endl;
-	std::cout << "Error Code: " << static_cast<int>(getError()) << " Limit Code: " << getLimit() << std::endl;
-	std::cout << "Drive Mode: " << int(getMode()) << " Direction: " << int(getDirection()) << std::endl;
-	std::cout << "Controller State: " << int(getState()) << std::endl;
-	std::cout << "-----------------------------" << std::endl;
-
-	std::cout << "Sending Command - Current: " << command.current << ", Velocity: " << command.velocity << std::endl;*/
-
     (transmit_func)(pack(cmd), t_state);	
 }

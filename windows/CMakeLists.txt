@@ -10,9 +10,9 @@ add_executable(${PROJECT_NAME}
     ../core/error.cpp
     ../core/input.cpp
     ../core/controller.cpp
-    ../core/wavesculptor_simulator.cpp
+    ../core/simulation/wavesculptor.cpp
     ../windows/main.cpp
-    ../windows/can_driver.cpp
+    ../windows/can/can_driver.cpp
     ../windows/clock.cpp
     ../windows/log.cpp
 )

@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <error.hpp>
 #include <input.hpp>
-#include <protocol.hpp>
+#include <can/can_protocol.hpp>
 
 /// @def STARTUP_DRIVE_MODE
 /// @brief Drive mode selected when the controller enters Startup state
@@ -52,8 +52,6 @@ struct SpeedCommand
 /// @details Can be swapped between smoothed or raw slider implementations
 using ControllerSliders = SmoothSliders;
 // using ControllerSliders = Sliders;
-
-class CANSerialState;
 
 /// @brief Main controller class for motor control logic
 /// @details

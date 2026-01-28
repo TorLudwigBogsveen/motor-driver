@@ -1,7 +1,8 @@
-#include "can_driver.hpp"
+#include "can/can_driver.hpp"
 #include "driver/twai.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+
+twai_message_t toTwaiMessage(const CanFrame& frame);
+CanFrame fromTwaiMessage(const twai_message_t& msg);
 
 Result CanDriver::initialize() {
     // Configure TWAI timing (500 kbps for typical automotive CAN)
@@ -68,7 +69,7 @@ Result CanDriver::receive(CanFrame& out_frame, uint32_t timeout_ms) {
     }
 }
 
-twai_message_t toTwaiMessage(const CanFrame& frame) const {
+twai_message_t toTwaiMessage(const CanFrame& frame) {
     twai_message_t msg{};
     msg.identifier = frame.id;
     msg.data_length_code = frame.dlc;
@@ -85,7 +86,7 @@ twai_message_t toTwaiMessage(const CanFrame& frame) const {
     return msg;
 }
 
-CanFrame fromTwaiMessage(const twai_message_t& msg) const {
+CanFrame fromTwaiMessage(const twai_message_t& msg) {
     CanFrame frame{};
     frame.id = msg.identifier;
     frame.dlc = msg.data_length_code;

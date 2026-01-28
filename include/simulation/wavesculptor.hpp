@@ -1,7 +1,7 @@
 #ifndef WAVESCULPTOR_SIMULATOR_HPP
 #define WAVESCULPTOR_SIMULATOR_HPP
 
-#include "protocol.hpp"
+#include "can/can_protocol.hpp"
 #include "clock.hpp"
 #include <cstdint>
 

@@ -1,11 +1,11 @@
 #include "can_driver.hpp"
-#include "protocol.hpp"
+#include "can/can_protocol.hpp"
 #include <stdio.h>
 #include <cmath>       // For sin, abs functions
 #include <algorithm>   // For std::min
 #include "log.hpp"
 #include "clock.hpp"
-#include "wavesculptor_simulator.hpp"
+#include "simulation/wavesculptor.hpp"
 
 static const char* TAG = "MOTOR_SIM";
 
