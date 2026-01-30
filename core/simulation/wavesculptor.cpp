@@ -1,4 +1,4 @@
-#include "can_driver.hpp"
+#include "can/can_driver.hpp"
 #include "can/can_protocol.hpp"
 #include <stdio.h>
 #include <cmath>       // For sin, abs functions
