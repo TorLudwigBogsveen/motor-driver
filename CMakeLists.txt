@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
-
-#set(ESP_PLATFORM TRUE)
+cmake_minimum_required(VERSION 3.10)
 
 # ESP-IDF build
 if(ESP_PLATFORM)

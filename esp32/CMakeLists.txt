@@ -6,8 +6,9 @@ idf_component_register(SRCS
 "log.cpp"
 "main.cpp"
 "clock.cpp"
+"../lib/ResponsiveAnalogRead/src/ResponsiveAnalogRead.cpp"
                     
-INCLUDE_DIRS "../include"
+INCLUDE_DIRS "../include" "../lib/ResponsiveAnalogRead/src"
 
-REQUIRES driver
+REQUIRES driver esp_timer
 )
