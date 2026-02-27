@@ -109,7 +109,7 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 		result |= setMotorControllerConnected(true);
 	}
 
-	if(buttons.get(DASHBOARD_BUTTON_NEUTRAL)) {
+	/*if(buttons.get(DASHBOARD_BUTTON_NEUTRAL)) {
 		result |= setDirection(MotorDirection::Neutral);
 	}
 	else if(buttons.get(DASHBOARD_BUTTON_FORWARD)) {
@@ -117,14 +117,14 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	}
 	else if(buttons.get(DASHBOARD_BUTTON_REVERSE)) {
 		result |= setDirection(MotorDirection::Backward);
-	}
+	}*/
 
 	if(result != MotorFlags::Success) {
 		setError(result);
 		log("CONTROLLER", "Error setting direction: %d", static_cast<int>(result));
 	}
 
-	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
+	/*if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
 		MotorFlags result = toggleCruise();
 		if (result != MotorFlags::Success) {
 			log("CONTROLLER", "Error toggling cruise: %d", static_cast<int>(result));
@@ -132,7 +132,7 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 	}
 	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
 		swapNextDriveMode();
-	}
+	}*/
 	
 	if(heatSinkTemp > MAX_TEMP || dspBoardTemp > MAX_TEMP || motorTemp > MAX_TEMP) {
 		setError(MotorFlags::ControllerError);
@@ -584,12 +584,33 @@ void Controller::processIncomingCommand(const CanFrame &frame)
     }
 	case ID_ACCELEROMETER_PERCENTAGE:
 	{
-		for (int i = 0; i < 8; i++) {
-			log("CONTROLLER", "%02x ", static_cast<int>(frame.data[i]));
-		}
 		DriverAccelerometer da(frame);
 		sliders.set(ACCELERATION_POTENTIOMETER, da.acceleration);
 		//log("CONTROLLER", "Received Accelerometer Value: %f", da.acceleration);
+		break;
+	}
+	case ID_DASHBOARD_BUTTONS:
+	{
+		DashboardButtons buttons(frame);
+		if (buttons.button_states & DASHBOARD_BUTTON_FORWARD) {
+			log("BUTTONS", "FORWARD");
+			if(setDirection(MotorDirection::Forward) != MotorFlags::Success) {
+				log("ERROR setting", "FORWARD");
+			}
+		}
+		if (buttons.button_states & DASHBOARD_BUTTON_NEUTRAL) {
+			log("BUTTONS", "NEUTRAL");
+			if(setDirection(MotorDirection::Neutral) != MotorFlags::Success) {
+				log("ERROR setting", "NEUTRAL");
+			}
+		}
+		if (buttons.button_states & DASHBOARD_BUTTON_REVERSE) {
+			log("BUTTONS", "REVERSE");
+			if(setDirection(MotorDirection::Backward) != MotorFlags::Success) {
+				log("ERROR setting", "REVERSE");
+			}
+		}
+		break;
 	}
     default:
         // TODO FIX
