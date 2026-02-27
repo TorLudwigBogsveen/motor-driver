@@ -40,7 +40,7 @@ void loop()
     //motor_sim.sendPeriodicMessages(static_cast<uint32_t>(controller_clock.elapsed_millis()), &can_driver, sim_can);
 
     controller.update(static_cast<uint32_t>(controller_clock.elapsed_millis()), static_cast<uint32_t>(controller_clock.elapsed_micros()));
-    controller.setDirection(MotorDirection::Forward);
+    //controller.setDirection(MotorDirection::Forward);
 
     auto con_can = [](const CanFrame &frame, void *t_state)
     {
@@ -51,7 +51,7 @@ void loop()
 
     // Send periodic messages
     controller.sendPeriodicMessages(static_cast<uint32_t>(controller_clock.elapsed_millis()), &can_driver, con_can);
-    controller.setMode(DriveMode::Velocity);
+    controller.setMode(DriveMode::Current);
 
     controller_clock.busyWait(100); // Prevent watchdog timeout
 }

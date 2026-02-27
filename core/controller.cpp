@@ -30,8 +30,8 @@ Controller::Controller()
 		driveMode(STARTUP_DRIVE_MODE),
 		lastDriveMode(STARTUP_DRIVE_MODE),
 		direction(MotorDirection::Neutral),
-		buttons(),
-		sliders(),
+		gasPedalPosition(0.0f),
+		brakePedalPosition(0.0f),
 		lastSentDriveCommand(0),
 		currentTime(0),
 		lastTime(0),
@@ -87,17 +87,11 @@ void Controller::setTime(uint32_t millis, uint32_t micros) {
 }
 
 void Controller::update(uint32_t millis, uint32_t micros) {
-	//Clear errors that are no longer valid
-	clearError();
-
 	currentTime = millis;
 	deltaTime = micros - lastTime;
 	lastTime = micros;
 
 	timeSinceMotorDataReceived += deltaTime;
-	
-	float c = sliders.getFloat(REGENERATION_POTENTIOMETER);
-	setMotorRegenMultiplier(c);
 
 	MotorFlags result = MotorFlags::Success;
 	if(timeSinceMotorDataReceived > (uint32_t)MOTOR_TIMEOUT*10000) { //timeSinceMotorDataReceived is in micros while MOTOR_TIMEOUT is in millis
@@ -109,33 +103,14 @@ void Controller::update(uint32_t millis, uint32_t micros) {
 		result |= setMotorControllerConnected(true);
 	}
 
-	/*if(buttons.get(DASHBOARD_BUTTON_NEUTRAL)) {
-		result |= setDirection(MotorDirection::Neutral);
-	}
-	else if(buttons.get(DASHBOARD_BUTTON_FORWARD)) {
-		result |= setDirection(MotorDirection::Forward);
-	}
-	else if(buttons.get(DASHBOARD_BUTTON_REVERSE)) {
-		result |= setDirection(MotorDirection::Backward);
-	}*/
-
 	if(result != MotorFlags::Success) {
 		setError(result);
 		log("CONTROLLER", "Error setting direction: %d", static_cast<int>(result));
 	}
-
-	/*if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
-		MotorFlags result = toggleCruise();
-		if (result != MotorFlags::Success) {
-			log("CONTROLLER", "Error toggling cruise: %d", static_cast<int>(result));
-		}
-	}
-	if(buttons.getJustPressed(DASHBOARD_BUTTON_CRUISE_CONTROL)) {
-		swapNextDriveMode();
-	}*/
 	
 	if(heatSinkTemp > MAX_TEMP || dspBoardTemp > MAX_TEMP || motorTemp > MAX_TEMP) {
 		setError(MotorFlags::ControllerError);
+		log("CONTROLLER", "Error hight temp: %f", std::max({heatSinkTemp, dspBoardTemp, motorTemp}));
 	}
 
 	switch (state) {
@@ -171,7 +146,7 @@ bool Controller::isInDriveMode() const {
 }
 
 bool Controller::isAccelerometerOff() const {
-	return sliders.getFloat(ACCELERATION_POTENTIOMETER) <= 0.0f + F32_EPSILON;
+	return gasPedalPosition <= 0.0f + F32_EPSILON;
 }
 
 MotorFlags Controller::toggleDirection() {
@@ -392,22 +367,6 @@ uint16_t Controller::getLimit() const {
 	return limit;
 }
 
-const Buttons& Controller::getButtons() const {
-	return buttons;
-}
-
-Buttons& Controller::getButtonsMut() {
-	return buttons;
-}
-
-const ControllerSliders& Controller::getSliders() const {
-	return sliders;
-}
-
-ControllerSliders& Controller::getSlidersMut() {
-	return sliders;
-}
-
 void Controller::stateStartup() {
 	if (!motorControllerConnected)
 		return;
@@ -458,27 +417,27 @@ void Controller::stateError() {
 
 void Controller::stateCurrentDrive() {
 	if (direction == MotorDirection::Forward) {
-		log("CONTROLLER", "Forward Current Drive, slider value: %f", sliders.getFloat(ACCELERATION_POTENTIOMETER));
-		setTargetMotorCurrentPercentage(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_CURRENT);
+		log("CONTROLLER", "Forward Current Drive, gas pedal position: %f", gasPedalPosition);
+		setTargetMotorCurrentPercentage(gasPedalPosition * MAX_FORWARD_CURRENT);
 		setTargetMotorVelocity(MAX_FORWARD_VELOCITY);
 	}
 	else if (direction == MotorDirection::Backward) {
-		setTargetMotorCurrentPercentage(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_BACKWARD_CURRENT);
+		setTargetMotorCurrentPercentage(gasPedalPosition * MAX_BACKWARD_CURRENT);
 		setTargetMotorVelocity(MAX_BACKWARD_VELOCITY);
 	}  
 }
 
 void Controller::stateVelocityDrive() {  
 	float maxCurrent;
-	log("CONTROLLER", "Velocity Drive, slider value: %f", sliders.getFloat(ACCELERATION_POTENTIOMETER));
-	log("CONTROLLER", "%f * %f = %f", sliders.getFloat(ACCELERATION_POTENTIOMETER), MAX_FORWARD_VELOCITY, sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_VELOCITY);
+	log("CONTROLLER", "Velocity Drive, gas pedal position: %f", gasPedalPosition);
+	log("CONTROLLER", "%f * %f = %f", gasPedalPosition, MAX_FORWARD_VELOCITY, gasPedalPosition * MAX_FORWARD_VELOCITY);
 	if (direction == MotorDirection::Forward) {
-		setTargetMotorVelocity(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_FORWARD_VELOCITY);
+		setTargetMotorVelocity(gasPedalPosition * MAX_FORWARD_VELOCITY);
 		maxCurrent = MAX_FORWARD_CURRENT;
 		log("CONTROLLER", "Target Velocity: %f", targetMotorVelocity);
 	}
 	else if (direction == MotorDirection::Backward) {
-		setTargetMotorVelocity(sliders.getFloat(ACCELERATION_POTENTIOMETER) * MAX_BACKWARD_VELOCITY);
+		setTargetMotorVelocity(gasPedalPosition * MAX_BACKWARD_VELOCITY);
 		maxCurrent = MAX_BACKWARD_CURRENT;
 		log("CONTROLLER", "Target Velocity: %f", targetMotorVelocity);
 	}
@@ -500,7 +459,7 @@ void Controller::stateCruise() {
 }
 
 void Controller::stateCustom1() {
-	float pedal = sliders.getFloat(ACCELERATION_POTENTIOMETER);
+	float pedal = gasPedalPosition;
 	float mid = 0.5f;
 	float dead = 0.05f;
 
@@ -540,6 +499,7 @@ void Controller::processIncomingCommand(const CanFrame &frame)
         VelocityMeasurement vm(frame);
         setVelocity(vm.vehicle_velocity);
         setMotorVelocity(vm.motor_velocity_rpm);
+		//log("CONTROLLER", "Received velocity measurement: %f m/s, %f rpm", vm.vehicle_velocity, vm.motor_velocity_rpm);
         break;
     }
     case ID_PHASE_CURRENT_MEASUREMENT:
@@ -585,7 +545,7 @@ void Controller::processIncomingCommand(const CanFrame &frame)
 	case ID_ACCELEROMETER_PERCENTAGE:
 	{
 		DriverAccelerometer da(frame);
-		sliders.set(ACCELERATION_POTENTIOMETER, da.acceleration);
+		gasPedalPosition = da.acceleration;
 		//log("CONTROLLER", "Received Accelerometer Value: %f", da.acceleration);
 		break;
 	}

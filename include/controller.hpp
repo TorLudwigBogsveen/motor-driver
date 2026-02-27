@@ -233,23 +233,35 @@ public:
     /// @brief Get active limit flags
     uint16_t getLimit() const;
 
-    /// @brief Access button input state (read-only)
-    const Buttons &getButtons() const;
-
-    /// @brief Access button input state (mutable)
-    Buttons &getButtonsMut();
-
-    /// @brief Access slider input state (read-only)
-    const ControllerSliders &getSliders() const;
-
-    /// @brief Access slider input state (mutable)
-    ControllerSliders &getSlidersMut();
-
     /// @brief Set measured motor velocity
     void setMotorVelocity(float velocity);
 
     /// @brief Get measured motor velocity
     float getMotorVelocity() const;
+
+    /// @brief Gas pedal position setter
+    /// @param position 
+    void setGasPedalPosition(float position) {
+        gasPedalPosition = position;
+    }
+
+    /// @brief Brake pedal position setter
+    /// @param position
+    void setBrakePedalPosition(float position) {
+        brakePedalPosition = position;
+    }
+
+    /// @brief Get gas pedal position
+    /// @return 
+    float getGasPedalPosition() const {
+        return gasPedalPosition;
+    }
+
+    /// @brief Get brake pedal position
+    /// @return
+    float getBrakePedalPosition() const {
+        return brakePedalPosition;
+    }
 
 private:
     /// @brief Startup state handler
@@ -284,15 +296,14 @@ private:
     DriveMode lastDriveMode;
     MotorDirection direction;
 
-    Buttons buttons;
-    ControllerSliders sliders;
-
     uint32_t lastSentDriveCommand;
     uint32_t currentTime;
     uint32_t lastTime;
     uint32_t deltaTime;
     uint32_t timeSinceMotorDataReceived;
 
+    float gasPedalPosition;
+    float brakePedalPosition;
     float regenMultiplier;
     float targetMotorCurrent;
     float targetMotorVelocity;
