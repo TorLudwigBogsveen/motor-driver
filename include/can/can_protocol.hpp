@@ -50,10 +50,11 @@ constexpr uint32_t ID_SLIP_SPEED_MEASUREMENT 				 = MOTOR_CONTROLLER_BASE_ADDRES
 // CAN Message Identifiers for Configuration Commands
 constexpr uint32_t ID_ACTIVE_MOTOR_CHANGE = MOTOR_CONTROLLER_BASE_ADDRESS + 0x12; ///< Active Motor Change, send this command to change the active motor (if multiple motors are configured)
 
-constexpr uint32_t ID_ACCELEROMETER_PERCENTAGE = ESP32_BASE_ADRESS + 0x0;
+constexpr uint32_t ID_VCU_PEDALS = ESP32_BASE_ADRESS + 0x0;
 constexpr uint32_t ID_DASHBOARD_BUTTONS = ESP32_BASE_ADRESS + 0x1;
 constexpr uint32_t ID_DASHBOARD_REGEN = ESP32_BASE_ADRESS + 0x2;
-constexpr uint32_t ID_DRIVER_ERROR = ESP32_BASE_ADRESS + 0x3;
+constexpr uint32_t ID_VCU_ERROR = ESP32_BASE_ADRESS + 0x3;
+constexpr uint32_t ID_VCU_DIRECTION_AND_MODE = ESP32_BASE_ADRESS + 0x4;
 
 
 // Forward Declarations of domain structs for CAN messages
@@ -78,8 +79,9 @@ struct SlipSpeedMeasurement;
 
 struct ActiveMotorChangeCommand;
 
-struct DriverAccelerometer;
-struct DriverError;
+struct VCUPedals;
+struct VCUError;
+struct VCUState;
 struct DashboardButtons;
 struct DashboardRegen;
 
@@ -105,8 +107,9 @@ CanFrame pack(const SlipSpeedMeasurement& measurement);
 
 CanFrame pack(const ActiveMotorChangeCommand& cmd);
 
-CanFrame pack(const DriverError& cmd);
-CanFrame pack(const DriverAccelerometer& cmd);
+CanFrame pack(const VCUError& cmd);
+CanFrame pack(const VCUPedals& cmd);
+CanFrame pack(const VCUState& cmd);
 CanFrame pack(const DashboardButtons& cmd);
 CanFrame pack(const DashboardRegen& cmd);
 
@@ -371,22 +374,37 @@ struct ActiveMotorChangeCommand {
 /// @brief Driver accelerometer data message for motor controller
 /// @note Contains the acceleration value from the driver's input device (e.g., pedal position)
 /// @warning Value should be in percentage (0-100%) eg 0.0f to 1.0f
-struct DriverAccelerometer {
+struct VCUPedals {
 	float acceleration; ///< (Units percentage) Driver acceleration value
+	float breaking; ///< (Units percentage) Driver braking value
 
 	/// @brief Construct from CAN frame (deserialize)
-	explicit DriverAccelerometer(const CanFrame& frame);
+	explicit VCUPedals(const CanFrame& frame);
 };
 
 /// @brief Driver error message for motor controller
 /// @note Contains the error code from the driver's input device
-struct DriverError {
+struct VCUError {
 	uint16_t error; ///< error code
 
-	DriverError() : error{0} {}
+	VCUError() : error{0} {}
 
 	/// @brief Construct from CAN frame (deserialize)
-	explicit DriverError(const CanFrame& frame);
+	explicit VCUError(const CanFrame& frame);
+};
+
+/// @brief Driver direction and mode message for motor controller
+/// @note Contains the desired direction and drive mode from the driver's input device
+struct VCUState {
+	int8_t direction; ///< Desired motor direction (0=Neutral, 1=Forward, -1=Reverse)
+	int8_t drive_mode; ///< Desired drive mode (0=Current, 1=Velocity, 2=Cruise, 3=Custom1)
+	int8_t state; ///< Desired controller state (0=Startup, 1=Running, 2=Parking, 3=Error)
+	// Low float reserved
+
+	VCUState() : direction{0}, drive_mode{0}, state{0} {}
+
+	/// @brief Construct from CAN frame (deserialize)
+	explicit VCUState(const CanFrame& frame);
 };
 
 constexpr uint8_t DASHBOARD_BUTTONS_COUNT = 16; ///< Number of dashboard buttons represented in the bitfield
@@ -529,8 +547,9 @@ inline ActiveMotorChangeCommand::ActiveMotorChangeCommand(const CanFrame& frame)
     std::memcpy(&active_motor, &frame.data[6], sizeof(uint16_t));
 }
 
-inline DriverAccelerometer::DriverAccelerometer(const CanFrame& frame) {
+inline VCUPedals::VCUPedals(const CanFrame& frame) {
     std::memcpy(&acceleration, &frame.data[0], sizeof(float));
+	std::memcpy(&breaking, &frame.data[4], sizeof(float));
 }
 
 inline DashboardButtons::DashboardButtons(const CanFrame& frame) {
@@ -542,8 +561,14 @@ inline DashboardRegen::DashboardRegen(const CanFrame& frame) {
 	std::memcpy(&regen_max, &frame.data[4], sizeof(float));
 }
 
-inline DriverError::DriverError(const CanFrame& frame) {
+inline VCUError::VCUError(const CanFrame& frame) {
 	std::memcpy(&error, &frame.data[0], sizeof(uint16_t));
+}
+
+inline VCUState::VCUState(const CanFrame& frame) {
+	direction = static_cast<int8_t>(frame.data[0]);
+	drive_mode = static_cast<int8_t>(frame.data[1]);
+	state = static_cast<int8_t>(frame.data[2]);
 }
 
 // ============================================================================
@@ -719,12 +744,12 @@ inline CanFrame pack(const ActiveMotorChangeCommand& cmd) {
 	return frame;
 }
 
-inline CanFrame pack(const DriverAccelerometer& da) {
+inline CanFrame pack(const VCUPedals& da) {
 	CanFrame frame{};
-	frame.id = ID_ACCELEROMETER_PERCENTAGE;
+	frame.id = ID_VCU_PEDALS;
 	frame.dlc = 8;
-	std::memset(frame.data, 0, 4);
-	std::memcpy(&frame.data[4], &da.acceleration, sizeof(float));
+	std::memcpy(&frame.data[0], &da.acceleration, sizeof(float));
+	std::memcpy(&frame.data[4], &da.breaking, sizeof(float));
 	return frame;
 }
 
@@ -746,12 +771,23 @@ inline CanFrame pack(const DashboardRegen& dr) {
 	return frame;
 }
 
-inline CanFrame pack(const DriverError& de) {
+inline CanFrame pack(const VCUError& de) {
 	CanFrame frame{};
-	frame.id = ID_DRIVER_ERROR;
+	frame.id = ID_VCU_ERROR;
 	frame.dlc = 8;
 	std::memcpy(&frame.data[0], &de.error, sizeof(uint16_t));
 	std::memset(&frame.data[4], 0, 4);
+	return frame;
+}
+
+inline CanFrame pack(const VCUState& dm) {
+	CanFrame frame{};
+	frame.id = ID_VCU_DIRECTION_AND_MODE;
+	frame.dlc = 8;
+	frame.data[0] = dm.direction;
+	frame.data[1] = dm.drive_mode;
+	frame.data[2] = dm.state;
+	std::memset(&frame.data[3], 0, 5);
 	return frame;
 }
 

@@ -542,9 +542,9 @@ void Controller::processIncomingCommand(const CanFrame &frame)
         SlipSpeedMeasurement ssm(frame);
         break;
     }
-	case ID_ACCELEROMETER_PERCENTAGE:
+	case ID_VCU_PEDALS:
 	{
-		DriverAccelerometer da(frame);
+		VCUPedals da(frame);
 		gasPedalPosition = da.acceleration;
 		//log("CONTROLLER", "Received Accelerometer Value: %f", da.acceleration);
 		break;
@@ -587,9 +587,15 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 	SpeedCommand command = motorCommand();
     MotorDriveCommand cmd(command.current, command.velocity);
 
-	DriverError error;
+	VCUError error;
 	error.error = static_cast<uint16_t>(getError());
 
+	VCUState dm;
+	dm.direction = static_cast<int8_t>(direction);
+	dm.drive_mode = static_cast<int8_t>(driveMode);
+	dm.state = static_cast<int8_t>(state);
+
 	(transmit_func)(pack(error), t_state);
+    (transmit_func)(pack(dm), t_state);
     (transmit_func)(pack(cmd), t_state);	
 }

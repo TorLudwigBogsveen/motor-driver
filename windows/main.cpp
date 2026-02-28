@@ -12,7 +12,7 @@ CanDriver can_driver;
 Controller controller;
 
 // Create motor controller simulator
-MotorControllerSimulator motor_sim;
+//MotorControllerSimulator motor_sim;
 
 Clock controller_clock;
 
