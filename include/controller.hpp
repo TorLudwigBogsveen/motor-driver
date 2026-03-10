@@ -27,6 +27,7 @@ enum class ControllerState : int8_t
     Startup,  ///< Initial power-on / reset state
     Running,  ///< Normal driving operation
     Parking,  ///< Stationary / disabled drive state
+    PitLimiter, ///< Reduced performance mode for pit lane speed limits
     Error     ///< Error-latched state requiring intervention
 };
 
@@ -290,6 +291,9 @@ private:
 
     /// @brief Custom / experimental drive mode
     void stateCustom1();
+
+    /// @brief Pit limiter mode
+    void statePitLimiter();
 
     ControllerState state;
     DriveMode driveMode;

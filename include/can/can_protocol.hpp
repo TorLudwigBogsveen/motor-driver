@@ -416,6 +416,7 @@ constexpr uint16_t DASHBOARD_BUTTON_CRUISE_CONTROL = 0x0010;   ///< Bit 4: Cruis
 constexpr uint16_t DASHBOARD_BUTTON_FORWARD = 0x0020;          ///< Bit 5: Forward
 constexpr uint16_t DASHBOARD_BUTTON_REVERSE = 0x0040;          ///< Bit 6: Reverse
 constexpr uint16_t DASHBOARD_BUTTON_NEUTRAL = 0x0080;          ///< Bit 7: Neutral
+constexpr uint16_t DASHBOARD_BUTTON_PIT_LIMITER = 0x0100;      ///< Bit 8: Pit Limiter
 
 /// @brief Dashboard button states
 /// @note Each bit corresponds to a button state

@@ -6,16 +6,19 @@
 constexpr float POT_DEAD_ZONE_THRESHOLD = 5.0f;
 
 #define F32_EPSILON 0.0001f //Just has to be a small number in order to be used for comparing f32 values
-#define ACCELERATION_POTENTIOMETER 0
-#define REGENERATION_POTENTIOMETER 1
 #define ACCELERATION_CUTOFF 50
-#define WHEEL_RADUIS 0.274f
+#define WHEEL_RADUIS 0.274f //In meters
+
+#define RPM_TO_KMPH(rpm) ((rpm * 2.0f * 3.14159f * WHEEL_RADUIS) / 1000.0f * 60.0f)
+#define KMPH_TO_RPM(kmph) ((kmph * 1000.0f / 60.0f) / (2.0f * 3.14159f * WHEEL_RADUIS))
 
 #define STARTUP_DRIVE_MODE DriveMode::Current
 #define MAX_FORWARD_CURRENT 1.0f //Percentage max current on controller
 #define MAX_BACKWARD_CURRENT 1.0f //Percentage max current on controller
-#define MAX_FORWARD_VELOCITY 400.0f //rpm
-#define MAX_BACKWARD_VELOCITY 200.0f //rpm
+#define MAX_FORWARD_VELOCITY KMPH_TO_RPM(20) //RPM
+#define MAX_BACKWARD_VELOCITY KMPH_TO_RPM(10) //RPM
+//3.19.5 Any vehicle driving on the pit lane must not exceed the maximum speed of 30km/h. This will be measured at all times during the event.
+#define MAX_PIT_LIMITER_VELOCITY KMPH_TO_RPM(15) //RPM
 #define MAX_TEMP 80.0f
 
 #define IS_STATIONARY_MARGIN 0.001f
@@ -214,6 +217,10 @@ MotorFlags Controller::setState(ControllerState state) {
 			if (!isStationary() && isAccelerometerOff()) return setError(MotorFlags::NotStationary);
 			this->state = ControllerState::Running;
 			break;
+		case ControllerState::PitLimiter:
+			if (!isStationary() && isAccelerometerOff()) return setError(MotorFlags::NotStationary);
+			this->state = ControllerState::PitLimiter;
+			break;
 		case ControllerState::Parking:
 			if (!isStationary() && isAccelerometerOff()) return setError(MotorFlags::NotStationary);
 			this->state = ControllerState::Parking;
@@ -408,9 +415,35 @@ void Controller::stateRunning() {
 	}
 }
 
+void Controller::statePitLimiter() {
+	if (direction == MotorDirection::Neutral) {
+		setTargetMotorCurrentPercentage(0.0f);
+		setTargetMotorVelocity(0.0f);
+		return;
+	}
+	switch (driveMode) {
+		case DriveMode::Current:
+			stateCurrentDrive();
+			break;
+		case DriveMode::Velocity:
+			stateVelocityDrive();
+			break;
+		case DriveMode::Cruise:
+			stateCruise();
+			break;
+		case DriveMode::Custom1:
+			stateCustom1();
+			break;
+	}
+
+	setTargetMotorVelocity(
+		(targetMotorVelocity / std::abs(targetMotorVelocity)) 
+		* std::min(std::abs(targetMotorVelocity), 
+		MAX_PIT_LIMITER_VELOCITY)
+	);
+}
+
 void Controller::stateError() {
-	//TODO give better error messages
-	//TODO write error to display
 	setTargetMotorCurrentPercentage(0.0f);
 	setTargetMotorVelocity(0.0f);
 }
@@ -456,6 +489,11 @@ void Controller::stateCruise() {
 	} else {
 		setTargetMotorCurrentPercentage(MAX_FORWARD_CURRENT * regenMultiplier);
 	}
+}
+
+void Controller::stateFreeWheel() {
+	setTargetMotorCurrentPercentage(0.0f);
+	setTargetMotorVelocity(0.0f);
 }
 
 void Controller::stateCustom1() {
@@ -568,6 +606,12 @@ void Controller::processIncomingCommand(const CanFrame &frame)
 			log("BUTTONS", "REVERSE");
 			if(setDirection(MotorDirection::Backward) != MotorFlags::Success) {
 				log("ERROR setting", "REVERSE");
+			}
+		}
+		if (buttons.button_states & DASHBOARD_BUTTON_PIT_LIMITER) {
+			log("BUTTONS", "PIT_LIMITER");
+			if(setState(ControllerState::PitLimiter) != MotorFlags::Success) {
+				log("ERROR setting", "PIT_LIMITER");
 			}
 		}
 		break;
