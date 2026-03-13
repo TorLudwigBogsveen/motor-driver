@@ -21,7 +21,7 @@ constexpr float POT_DEAD_ZONE_THRESHOLD = 5.0f;
 #define MAX_PIT_LIMITER_VELOCITY KMPH_TO_RPM(15) //RPM
 #define MAX_TEMP 80.0f
 
-#define IS_STATIONARY_MARGIN 0.001f
+#define IS_STATIONARY_MARGIN 1.0f
 #define CRUISE_VELOCITY_TIME_TO_CHANGE 100000 //Time in microseconds
 #define MOTOR_TIMEOUT 4000
 
@@ -633,6 +633,10 @@ void Controller::sendPeriodicMessages(uint32_t current_time_ms, void* t_state, v
 
 	VCUError error;
 	error.error = static_cast<uint16_t>(getError());
+
+	if (error.error != 0) {
+		log("CONTROLLER", "Sending error code: %d", error.error);
+	}
 
 	VCUState dm;
 	dm.direction = static_cast<int8_t>(direction);
